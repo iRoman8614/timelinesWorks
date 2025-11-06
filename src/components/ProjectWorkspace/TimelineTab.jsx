@@ -1,5 +1,5 @@
 import React, {useState, useMemo, useCallback} from 'react';
-import { Card } from 'antd';
+import { Card, Modal, Descriptions } from 'antd';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
@@ -7,6 +7,9 @@ import { getContrastTextColor } from '../../utils/contrastTextColor';
 
 const TimelineTab = ({ project }) => {
     const [zoom, setZoom] = useState(30);
+    const [trackStates, setTrackStates] = useState({});
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedElement, setSelectedElement] = useState(null);
 
     const getStateColor = (stateType) => {
         const colors = {
@@ -39,10 +42,35 @@ const TimelineTab = ({ project }) => {
 
     const clickElement = useCallback((element) => {
         console.log('Clicked element:', element);
+        setSelectedElement(element);
+        setIsModalOpen(true);
+    }, []);
+
+    const handleModalClose = useCallback(() => {
+        setIsModalOpen(false);
+        setSelectedElement(null);
+    }, []);
+
+    const formatDate = useCallback((date) => {
+        if (!date) return 'Не указано';
+        const d = new Date(date);
+        return d.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+    }, []);
+
+    const toggleTrackOpen = useCallback((track) => {
+        setTrackStates(prev => ({
+            ...prev,
+            [track.id]: !prev[track.id]
+        }));
     }, []);
 
     const clickTrackButton = useCallback((track) => {
         console.log('Clicked track button:', track);
+        // Если нужно, можно добавить дополнительную логику здесь
     }, []);
 
     const customElementRenderer = useCallback(({ element, ...props }) => {
@@ -93,8 +121,7 @@ const TimelineTab = ({ project }) => {
                 id: node.id,
                 title: node.name,
                 elements: [],
-                tracks: [],
-                isOpen: true // Всегда открыт
+                tracks: []
             };
 
             if (node.children) {
@@ -109,6 +136,11 @@ const TimelineTab = ({ project }) => {
                 });
             }
 
+            // Устанавливаем isOpen только если есть дочерние элементы
+            if (track.tracks.length > 0) {
+                track.isOpen = trackStates[node.id] !== undefined ? trackStates[node.id] : true;
+            }
+
             return track;
         };
 
@@ -118,8 +150,7 @@ const TimelineTab = ({ project }) => {
                 id: assembly.id,
                 title: assembly.name,
                 elements: [],
-                tracks: [],
-                isOpen: true // Всегда открыт
+                tracks: []
             };
 
             // Получаем состояния агрегата
@@ -150,7 +181,7 @@ const TimelineTab = ({ project }) => {
 
                 assemblyTrack.elements.push({
                     id: `state-${assembly.id}-${index}`,
-                    title: stateName, // Показываем название состояния на элементе
+                    title: stateName,
                     start: stateStart,
                     end: stateEnd,
                     style: {
@@ -169,12 +200,13 @@ const TimelineTab = ({ project }) => {
             const components = getComponentsForAssembly(assembly.assemblyTypeId);
 
             components.forEach(component => {
+                const componentId = `${assembly.id}-${component.id}`;
                 const componentTrack = {
-                    id: `${assembly.id}-${component.id}`,
+                    id: componentId,
                     title: component.name,
                     elements: [],
-                    tracks: [],
-                    isOpen: true
+                    tracks: []
+                    // Не устанавливаем isOpen для самых дочерних элементов
                 };
 
                 // Находим Unit, назначенный на этот компонент
@@ -228,6 +260,11 @@ const TimelineTab = ({ project }) => {
                 assemblyTrack.tracks.push(componentTrack);
             });
 
+            // Устанавливаем isOpen только если есть дочерние элементы
+            if (assemblyTrack.tracks.length > 0) {
+                assemblyTrack.isOpen = trackStates[assembly.id] !== undefined ? trackStates[assembly.id] : true;
+            }
+
             return assemblyTrack;
         };
 
@@ -241,7 +278,7 @@ const TimelineTab = ({ project }) => {
             start: minDate,
             end: maxDate
         };
-    }, [project]);
+    }, [project, trackStates]);
 
     const now = new Date();
 
@@ -313,6 +350,7 @@ const TimelineTab = ({ project }) => {
                         zoomOut={zoomOut}
                         clickElement={clickElement}
                         clickTrackButton={clickTrackButton}
+                        toggleTrackOpen={toggleTrackOpen}
                         timebar={timebar}
                         tracks={tracks}
                         now={now}
@@ -322,6 +360,27 @@ const TimelineTab = ({ project }) => {
                     />
                 </div>
             </Card>
+            <Modal
+                title="Информация о работе"
+                open={isModalOpen}
+                onCancel={handleModalClose}
+                footer={null}
+                width={600}
+            >
+                {selectedElement && (
+                    <Descriptions column={1} bordered>
+                        <Descriptions.Item label="Название работы">
+                            {selectedElement.title || selectedElement.dataTitle || 'Не указано'}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Дата начала">
+                            {formatDate(selectedElement.start)}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Дата окончания">
+                            {formatDate(selectedElement.end)}
+                        </Descriptions.Item>
+                    </Descriptions>
+                )}
+            </Modal>
         </div>
     );
 };
