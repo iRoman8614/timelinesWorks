@@ -134,9 +134,13 @@
     background: #fff;
 }
 
-/* Grid lines for better readability */
+/* Grid lines for better readability - вертикальные линии для дней */
+.rt-grid__cell {
+    border-left: 1px solid #e8e8e8;
+}
+
 .rt-timeline__grid-line {
-    border-left: 1px solid #f0f0f0;
+    border-left: 1px solid #e8e8e8;
 }
 
 .rt-timeline__grid-line--now {
@@ -194,6 +198,22 @@
 
 .timeline-wrapper::-webkit-scrollbar-thumb:hover {
     background: #8c8c8c;
+}
+
+/* Стили для кнопок зума */
+.rt-controls__button {
+    border: none !important;
+    border-radius: 12px !important;
+    transition: background-color 0.2s ease;
+}
+
+.rt-controls__button:hover:not([disabled]) {
+    background-color: #f5f5f5 !important;
+}
+
+.rt-controls__button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Легенда */

@@ -90,11 +90,11 @@ const TimelineTab = ({ project }) => {
 
     const { tracks, start, end } = useMemo(() => {
         if (!project || !project.nodes) {
-            return { tracks: [], start: new Date('2024-01-01'), end: new Date('2024-12-31') };
+            return { tracks: [], start: new Date('2025-01-01'), end: new Date('2025-12-31') };
         }
 
-        let minDate = new Date('2024-01-01');
-        let maxDate = new Date('2024-12-31');
+        let minDate = new Date('2025-01-01');
+        let maxDate = new Date('2025-12-31');
 
         const allTracks = [];
 
@@ -113,6 +113,17 @@ const TimelineTab = ({ project }) => {
                 }
             });
             return allMaintenanceTypes.find(mt => mt.id === maintenanceTypeId);
+        };
+
+        // Функция для получения информации о Unit по ID
+        const getUnit = (unitId) => {
+            for (const partModel of project.partModels || []) {
+                const unit = partModel.units?.find(u => u.id === unitId);
+                if (unit) {
+                    return { ...unit, partModelName: partModel.name };
+                }
+            }
+            return null;
         };
 
         // Рекурсивная функция для обработки узлов
@@ -163,7 +174,7 @@ const TimelineTab = ({ project }) => {
                 const stateStart = new Date(state.dateTime);
                 const stateEnd = assemblyStates[index + 1]
                     ? new Date(assemblyStates[index + 1].dateTime)
-                    : new Date('2024-12-31');
+                    : new Date('2025-12-31');
 
                 const startDateStr = stateStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
                 const endDateStr = stateEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
@@ -206,19 +217,74 @@ const TimelineTab = ({ project }) => {
                     title: component.name,
                     elements: [],
                     tracks: []
-                    // Не устанавливаем isOpen для самых дочерних элементов
                 };
 
-                // Находим Unit, назначенный на этот компонент
-                const unitAssignment = project.timeline?.unitAssignments?.find(
+               const unitAssignments = project.timeline?.unitAssignments?.filter(
                     ua => ua.componentOfAssembly?.assemblyId === assembly.id &&
                         ua.componentOfAssembly?.componentPath?.includes(component.id)
-                );
+                ) || [];
 
-                if (unitAssignment) {
-                    // Находим все MaintenanceEvent для этого Unit
+                unitAssignments.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+                unitAssignments.forEach((unitAssignment, assignmentIndex) => {
+                    const assignmentStart = new Date(unitAssignment.dateTime);
+                    // Определяем конец периода назначения: либо дата следующего назначения, либо конец года
+                    const assignmentEnd = assignmentIndex < unitAssignments.length - 1
+                        ? new Date(unitAssignments[assignmentIndex + 1].dateTime)
+                        : new Date('2025-12-31');
+
+                    if (assignmentIndex > 0) {
+                        const prevUnit = getUnit(unitAssignments[assignmentIndex - 1].unitId);
+                        const currentUnit = getUnit(unitAssignment.unitId);
+                        
+                        const prevUnitName = prevUnit ? `${prevUnit.name} (${prevUnit.partModelName})` : 'Неизвестный юнит';
+                        const currentUnitName = currentUnit ? `${currentUnit.name} (${currentUnit.partModelName})` : 'Неизвестный юнит';
+                        
+                        const replacementDateStr = assignmentStart.toLocaleDateString('ru-RU', { 
+                            day: '2-digit', 
+                            month: '2-digit', 
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
+                        const replacementTooltip = `Замена юнита\nДата: ${replacementDateStr}\nС: ${prevUnitName}\nНа: ${currentUnitName}`;
+
+                        // Добавляем маркер замены юнита (вертикальная линия)
+                        // Используем минимальную длительность для отображения вертикальной линии
+                        const markerEnd = new Date(assignmentStart);
+                        markerEnd.setHours(markerEnd.getHours() + 1); // 1 час для видимости
+                        
+                        componentTrack.elements.push({
+                            id: `unit-replacement-${componentId}-${assignmentIndex}`,
+                            title: 'Замена',
+                            start: assignmentStart,
+                            end: markerEnd,
+                            style: {
+                                backgroundColor: '#ff9800',
+                                borderRadius: '2px',
+                                color: '#fff',
+                                fontSize: '12px',
+                                fontWeight: '700',
+                                border: '3px solid #f57c00',
+                                minWidth: '6px',
+                                width: '6px',
+                                zIndex: 100,
+                                boxShadow: '0 2px 6px rgba(255,152,0,0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2px'
+                            },
+                            dataTitle: replacementTooltip
+                        });
+                    }
+
+                    // Находим все MaintenanceEvent для этого Unit в период его назначения
                     const maintenanceEvents = project.timeline?.maintenanceEvents?.filter(
-                        me => me.unitId === unitAssignment.unitId
+                        me => me.unitId === unitAssignment.unitId &&
+                            new Date(me.dateTime) >= assignmentStart &&
+                            new Date(me.dateTime) < assignmentEnd
                     ) || [];
 
                     maintenanceEvents.forEach(event => {
@@ -237,25 +303,25 @@ const TimelineTab = ({ project }) => {
 
                             componentTrack.elements.push({
                                 id: event.maintenanceTypeId + '-' + event.dateTime,
-                                title: maintenanceType.name, // Короткое название для отображения
+                                title: maintenanceType.name,
                                 start: eventStart,
                                 end: eventEnd,
                                 style: {
                                     backgroundColor: bgColor,
                                     borderRadius: '4px',
-                                    color: textColor, // Контрастный цвет текста
+                                    color: textColor,
                                     fontSize: '11px',
                                     fontWeight: '500',
                                     border: 'none'
                                 },
-                                dataTitle: tooltipText // Для кастомного тултипа
+                                dataTitle: tooltipText
                             });
 
                             if (eventStart < minDate) minDate = eventStart;
                             if (eventEnd > maxDate) maxDate = eventEnd;
                         }
                     });
-                }
+                });
 
                 assemblyTrack.tracks.push(componentTrack);
             });
@@ -313,17 +379,18 @@ const TimelineTab = ({ project }) => {
             title: 'Месяцы',
             cells: Array.from({ length: 12 }, (_, i) => ({
                 id: `month-${i}`,
-                title: new Date(2024, i, 1).toLocaleDateString('ru-RU', { month: 'long' }),
-                start: new Date(2024, i, 1),
-                end: new Date(2024, i + 1, 1)
+                title: new Date(2025, i, 1).toLocaleDateString('ru-RU', { month: 'long' }),
+                start: new Date(2025, i, 1),
+                end: new Date(2025, i + 1, 1)
             })),
             style: {}
         },
         {
             id: 'days',
             title: 'Дни',
-            cells: generateDaysInRange(new Date('2024-01-01'), new Date('2024-12-31')),
-            style: {}
+            cells: generateDaysInRange(new Date('2025-01-01'), new Date('2025-12-31')),
+            style: {},
+            useAsGrid: true // Используем дни для генерации вертикальных линий сетки
         }
     ];
 

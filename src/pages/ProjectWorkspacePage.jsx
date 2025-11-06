@@ -54,16 +54,15 @@ const ProjectWorkspacePage = () => {
     const tabItems = [
         {
             key: 'timeline',
-            label: '📊 Таймлайн',
+            label: 'Таймлайн',
             children: <TimelineTab project={project} />
         },
         {
             key: 'configurator',
-            label: '⚙️ Конфигуратор',
+            label: 'Конфигуратор',
             children: (
                 <div className="tab-content">
-                    <Title level={4}>Конфигуратор (в разработке)</Title>
-                    <p>Здесь будут настройки типов работ, агрегатов, компонентов и деталей</p>
+                    <Title level={4}>Конфигуратор</Title>
                 </div>
             )
         }

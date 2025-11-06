@@ -43,8 +43,6 @@ export const mockProjects = {
         id: 'project-gps',
         name: 'Тестовый проект ГПС',
         description: 'Тестовый проект для отладки оптимизатора',
-
-        // Типы агрегатов
         assemblyTypes: [
             {
                 id: '550e8400-e29b-41d4-a716-446655440001',
@@ -91,8 +89,6 @@ export const mockProjects = {
                 ]
             }
         ],
-
-        // Типы компонентов
         componentTypes: [
             {
                 id: '550e8400-e29b-41d4-a716-446655440100',
@@ -110,8 +106,6 @@ export const mockProjects = {
                 description: 'Воздушный фильтр'
             }
         ],
-
-        // Модели деталей
         partModels: [
             {
                 id: '550e8400-e29b-41d4-a716-446655440200',
@@ -256,8 +250,6 @@ export const mockProjects = {
                 ]
             }
         ],
-
-        // Иерархия узлов
         nodes: [
             {
                 id: '550e8400-e29b-41d4-a716-446655440500',
@@ -346,52 +338,49 @@ export const mockProjects = {
                 ]
             }
         ],
-
-        // Timeline события
         timeline: {
             assemblyStates: [
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440600',
                     type: 'WORKING',
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440600',
                     type: 'IDLE',
-                    dateTime: '2024-01-11T00:00:00'
+                    dateTime: '2025-01-11T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440600',
                     type: 'WORKING',
-                    dateTime: '2024-01-19T00:00:00'
+                    dateTime: '2025-01-19T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440601',
                     type: 'WORKING',
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440601',
                     type: 'IDLE',
-                    dateTime: '2024-01-16T00:00:00'
+                    dateTime: '2025-01-16T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440601',
                     type: 'WORKING',
-                    dateTime: '2024-01-22T00:00:00'
+                    dateTime: '2025-01-22T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440602',
                     type: 'WORKING',
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 },
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440603',
                     type: 'WORKING',
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 }
             ],
-
             unitAssignments: [
                 {
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
@@ -399,7 +388,15 @@ export const mockProjects = {
                         assemblyId: '550e8400-e29b-41d4-a716-446655440600',
                         componentPath: ['550e8400-e29b-41d4-a716-446655440010']
                     },
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
+                },
+                {
+                    unitId: '550e8400-e29b-41d4-a716-446655440401',
+                    componentOfAssembly: {
+                        assemblyId: '550e8400-e29b-41d4-a716-446655440600',
+                        componentPath: ['550e8400-e29b-41d4-a716-446655440010']
+                    },
+                    dateTime: '2025-07-01T00:00:00'
                 },
                 {
                     unitId: '550e8400-e29b-41d4-a716-446655440404',
@@ -407,7 +404,7 @@ export const mockProjects = {
                         assemblyId: '550e8400-e29b-41d4-a716-446655440600',
                         componentPath: ['550e8400-e29b-41d4-a716-446655440011']
                     },
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 },
                 {
                     unitId: '550e8400-e29b-41d4-a716-446655440401',
@@ -415,7 +412,7 @@ export const mockProjects = {
                         assemblyId: '550e8400-e29b-41d4-a716-446655440601',
                         componentPath: ['550e8400-e29b-41d4-a716-446655440013']
                     },
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 },
                 {
                     unitId: '550e8400-e29b-41d4-a716-446655440405',
@@ -423,48 +420,53 @@ export const mockProjects = {
                         assemblyId: '550e8400-e29b-41d4-a716-446655440601',
                         componentPath: ['550e8400-e29b-41d4-a716-446655440014']
                     },
-                    dateTime: '2024-01-01T00:00:00'
+                    dateTime: '2025-01-01T00:00:00'
                 }
             ],
-
             maintenanceEvents: [
-                // ТО для ГПА-1
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
-                    dateTime: '2024-01-11T00:00:00'
+                    dateTime: '2025-01-11T00:00:00'
                 },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440301',
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
-                    dateTime: '2024-03-15T00:00:00'
+                    dateTime: '2025-03-15T00:00:00'
                 },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
-                    dateTime: '2024-06-20T00:00:00'
+                    dateTime: '2025-06-20T00:00:00'
                 },
-                // ТО для ГПА-2
+                {
+                    maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
+                    unitId: '550e8400-e29b-41d4-a716-446655440401',
+                    dateTime: '2025-08-15T00:00:00'
+                },
+                {
+                    maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440301',
+                    unitId: '550e8400-e29b-41d4-a716-446655440401',
+                    dateTime: '2025-10-20T00:00:00'
+                },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440302',
                     unitId: '550e8400-e29b-41d4-a716-446655440405',
-                    dateTime: '2024-01-16T00:00:00'
+                    dateTime: '2025-01-16T00:00:00'
                 },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440303',
                     unitId: '550e8400-e29b-41d4-a716-446655440405',
-                    dateTime: '2024-04-10T00:00:00'
+                    dateTime: '2025-04-10T00:00:00'
                 },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440302',
                     unitId: '550e8400-e29b-41d4-a716-446655440405',
-                    dateTime: '2024-07-15T00:00:00'
+                    dateTime: '2025-07-15T00:00:00'
                 }
             ]
         }
     },
-
-    // Пустые проекты для других элементов дерева
     'project-b': {
         id: 'project-b',
         name: 'Проект Б',
