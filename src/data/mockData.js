@@ -1,5 +1,3 @@
-// Моковые данные для демо-версии на основе структуры из ТО_Структура_данных_2.txt
-
 export const mockStructureTree = {
     rootItems: [
         {
@@ -424,7 +422,6 @@ export const mockProjects = {
                 }
             ],
             maintenanceEvents: [
-                // ДВ-001 (ГПА-1, Основной двигатель) - до замены 01.07.2025
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
@@ -433,7 +430,7 @@ export const mockProjects = {
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440301',
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
-                    dateTime: '2025-02-05T00:00:00'
+                    dateTime: '2025-01-11T00:00:00'
                 },
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
@@ -460,7 +457,6 @@ export const mockProjects = {
                     unitId: '550e8400-e29b-41d4-a716-446655440400',
                     dateTime: '2025-06-20T00:00:00'
                 },
-                // ДВ-002 (ГПА-1, Основной двигатель) - после замены 01.07.2025
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
                     unitId: '550e8400-e29b-41d4-a716-446655440401',
@@ -491,7 +487,6 @@ export const mockProjects = {
                     unitId: '550e8400-e29b-41d4-a716-446655440401',
                     dateTime: '2025-12-05T00:00:00'
                 },
-                // ДВ-002 (ГПА-2, Основной двигатель)
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440300',
                     unitId: '550e8400-e29b-41d4-a716-446655440401',
@@ -532,7 +527,6 @@ export const mockProjects = {
                     unitId: '550e8400-e29b-41d4-a716-446655440401',
                     dateTime: '2025-11-28T00:00:00'
                 },
-                // КОМП-001 (ГПА-1, Основной компрессор)
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440302',
                     unitId: '550e8400-e29b-41d4-a716-446655440404',
@@ -593,7 +587,6 @@ export const mockProjects = {
                     unitId: '550e8400-e29b-41d4-a716-446655440404',
                     dateTime: '2025-12-10T00:00:00'
                 },
-                // КОМП-002 (ГПА-2, Основной компрессор)
                 {
                     maintenanceTypeId: '550e8400-e29b-41d4-a716-446655440302',
                     unitId: '550e8400-e29b-41d4-a716-446655440405',
