@@ -1,0 +1,31 @@
+/* src/pages/ProjectWorkspace.css */
+.project-workspace .ant-collapse {
+    background: transparent;
+}
+
+.project-workspace .ant-collapse-item {
+    margin-bottom: 24px;
+    border-radius: 8px !important;
+    border: 2px solid #d9d9d9;
+    overflow: hidden;
+    background: #fff;
+}
+
+.project-workspace .ant-collapse-header {
+    font-weight: 600;
+    font-size: 16px;
+    padding: 16px 24px !important;
+    background: #fafafa !important;
+}
+
+.project-workspace .ant-collapse-content-box {
+    padding: 24px;
+}
+
+.tab-content {
+    padding: 24px;
+}
+
+.project-workspace .ant-collapse-item-active {
+    border-color: #1890ff;
+}
