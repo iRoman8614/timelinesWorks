@@ -4,7 +4,6 @@ import { FolderOutlined, FolderOpenOutlined, ProjectOutlined } from '@ant-design
 import './ProjectTree.css';
 
 const ProjectTree = ({ data, onSelectProject }) => {
-    // Рекурсивная функция для преобразования данных в формат Tree
     const convertToTreeData = (items) => {
         return items.map(item => {
             const treeNode = {

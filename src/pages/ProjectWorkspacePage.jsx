@@ -564,7 +564,7 @@ const ProjectWorkspacePage = () => {
             </Header>
             <Content style={{ padding: '24px', background: '#f0f2f5' }}>
                 <div className="project-workspace">
-                    <Tabs defaultActiveKey="configurator" items={tabItems} />
+                    <Tabs defaultActiveKey="timeline" items={tabItems} />
                 </div>
             </Content>
 

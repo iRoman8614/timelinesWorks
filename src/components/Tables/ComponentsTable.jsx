@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import { Table, Button, Space, Tag, Typography } from 'antd';
-import {EditOutlined, DeleteOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
+import {DeleteOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
 
 const { Text } = Typography;
 

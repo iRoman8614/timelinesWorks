@@ -1,6 +1,5 @@
-// src/components/ProjectWorkspace/InstructionBlock.jsx
 import React from 'react';
-import { Alert, Collapse, Typography, Tag, Space } from 'antd';
+import { Collapse, Typography, Space } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 
 const { Panel } = Collapse;
