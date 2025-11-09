@@ -1,16 +1,32 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Form, Input, Select, Button, Space } from 'antd';
 
 const AssemblyForm = ({ onSubmit, initialValues, assemblyTypes = [] }) => {
     const [form] = Form.useForm();
 
+    useEffect(() => {
+        if (initialValues) {
+            form.setFieldsValue({
+                name: initialValues.name,
+                description: initialValues.description,
+                assemblyTypeId: initialValues.assemblyTypeId
+            });
+        } else {
+            form.resetFields();
+        }
+    }, [form, initialValues]);
+
     const handleFinish = (values) => {
         const assemblyData = {
             id: initialValues?.id || crypto.randomUUID(),
-            name: values.name,
-            description: values.description,
-            type: values.type
+            name: values.name?.trim(),
+            description: values.description?.trim() || '',
+            type: 'ASSEMBLY',
+            assemblyTypeId: values.assemblyTypeId,
+            children: initialValues?.children || [],
+            conditions: initialValues?.conditions || []
         };
+
         onSubmit(assemblyData);
         form.resetFields();
     };
@@ -20,7 +36,6 @@ const AssemblyForm = ({ onSubmit, initialValues, assemblyTypes = [] }) => {
             form={form}
             layout="vertical"
             onFinish={handleFinish}
-            initialValues={initialValues}
         >
             <Form.Item
                 name="name"
@@ -31,7 +46,7 @@ const AssemblyForm = ({ onSubmit, initialValues, assemblyTypes = [] }) => {
             </Form.Item>
 
             <Form.Item
-                name="type"
+                name="assemblyTypeId"
                 label="Тип агрегата"
                 rules={[{ required: true, message: 'Выберите тип' }]}
             >
@@ -54,7 +69,7 @@ const AssemblyForm = ({ onSubmit, initialValues, assemblyTypes = [] }) => {
             <Form.Item>
                 <Space>
                     <Button type="primary" htmlType="submit">
-                        Создать
+                        Сохранить
                     </Button>
                     <Button onClick={() => form.resetFields()}>
                         Очистить

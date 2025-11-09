@@ -4,7 +4,7 @@ import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
 import { getContrastTextColor } from '../../utils/contrastTextColor';
-import { UnitAssignmentForm } from '../Forms';
+import { UnitAssignmentForm, MaintenanceEventForm } from '../Forms';
 import { dataService } from '../../services/dataService';
 
 const { Panel } = Collapse;
@@ -89,6 +89,32 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         } catch (error) {
             console.error('Ошибка при назначении детали:', error);
             message.error('Ошибка при назначении детали');
+        }
+    }, [project, onProjectUpdate]);
+
+    const handleAddMaintenanceEvent = useCallback(async (eventData) => {
+        try {
+            const updatedProject = {
+                ...project,
+                timeline: {
+                    ...project.timeline,
+                    maintenanceEvents: [
+                        ...(project.timeline?.maintenanceEvents || []),
+                        eventData
+                    ]
+                }
+            };
+
+            await dataService.saveProject(project.id, updatedProject);
+
+            message.success('Работа успешно запланирована');
+
+            if (onProjectUpdate) {
+                onProjectUpdate(updatedProject);
+            }
+        } catch (error) {
+            console.error('Ошибка при планировании работы:', error);
+            message.error('Ошибка при планировании работы');
         }
     }, [project, onProjectUpdate]);
 
@@ -274,13 +300,21 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                         ? new Date(unitAssignments[assignmentIndex + 1].dateTime)
                         : new Date('2025-12-31');
 
+                    const currentUnit = getUnit(unitAssignment.unitId);
+                    const currentUnitName = currentUnit ? `${currentUnit.name} (${currentUnit.partModelName})` : 'Неизвестный юнит';
+
+                    const markerEnd = new Date(assignmentStart);
+                    markerEnd.setHours(markerEnd.getHours() + 1); // тонкая полоса
+
+                    if (assignmentStart < minDate) minDate = assignmentStart;
+                    if (assignmentEnd > maxDate) maxDate = assignmentEnd;
+
+                    let tooltip = `Назначение юнита\nЮнит: ${currentUnitName}\nДата: ${assignmentStart.toLocaleString('ru-RU')}`;
+                    let markerTitle = 'Назначение';
+
                     if (assignmentIndex > 0) {
                         const prevUnit = getUnit(unitAssignments[assignmentIndex - 1].unitId);
-                        const currentUnit = getUnit(unitAssignment.unitId);
-
                         const prevUnitName = prevUnit ? `${prevUnit.name} (${prevUnit.partModelName})` : 'Неизвестный юнит';
-                        const currentUnitName = currentUnit ? `${currentUnit.name} (${currentUnit.partModelName})` : 'Неизвестный юнит';
-
                         const replacementDateStr = assignmentStart.toLocaleDateString('ru-RU', {
                             day: '2-digit',
                             month: '2-digit',
@@ -289,37 +323,33 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                             minute: '2-digit'
                         });
 
-                        const replacementTooltip = `Замена юнита\nДата: ${replacementDateStr}\nС: ${prevUnitName}\nНа: ${currentUnitName}`;
-
-                        // Добавляем маркер замены юнита (вертикальная линия)
-                        // Используем минимальную длительность для отображения вертикальной линии
-                        const markerEnd = new Date(assignmentStart);
-                        markerEnd.setHours(markerEnd.getHours() + 1); // 1 час для видимости
-
-                        componentTrack.elements.push({
-                            id: `unit-replacement-${componentId}-${assignmentIndex}`,
-                            title: 'Замена',
-                            start: assignmentStart,
-                            end: markerEnd,
-                            style: {
-                                backgroundColor: '#ff9800',
-                                borderRadius: '2px',
-                                color: '#fff',
-                                fontSize: '12px',
-                                fontWeight: '700',
-                                border: '3px solid #f57c00',
-                                minWidth: '6px',
-                                width: '6px',
-                                zIndex: 100,
-                                boxShadow: '0 2px 6px rgba(255,152,0,0.5)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: '2px'
-                            },
-                            dataTitle: replacementTooltip
-                        });
+                        tooltip = `Замена юнита\nДата: ${replacementDateStr}\nС: ${prevUnitName}\nНа: ${currentUnitName}`;
+                        markerTitle = 'Замена';
                     }
+
+                    componentTrack.elements.push({
+                        id: `unit-assignment-${componentId}-${assignmentIndex}`,
+                        title: markerTitle,
+                        start: assignmentStart,
+                        end: markerEnd,
+                        style: {
+                            backgroundColor: '#ff9800',
+                            borderRadius: '2px',
+                            color: '#fff',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            border: '3px solid #f57c00',
+                            minWidth: '6px',
+                            width: '6px',
+                            zIndex: 100,
+                            boxShadow: '0 2px 6px rgba(255,152,0,0.5)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '2px'
+                        },
+                        dataTitle: tooltip
+                    });
 
                     // Находим все MaintenanceEvent для этого Unit в период его назначения
                     const maintenanceEvents = project.timeline?.maintenanceEvents?.filter(
@@ -453,6 +483,12 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     <Panel header="Добавить назначение детали" key="1">
                         <UnitAssignmentForm
                             onSubmit={handleAddUnitAssignment}
+                            project={project}
+                        />
+                    </Panel>
+                    <Panel header="Добавить плановую работу" key="2">
+                        <MaintenanceEventForm
+                            onSubmit={handleAddMaintenanceEvent}
                             project={project}
                         />
                     </Panel>

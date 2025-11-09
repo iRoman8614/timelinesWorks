@@ -34,9 +34,12 @@ const ComponentsTable = ({ components, onEdit, onDelete, componentTypes = [] }) 
         },
         {
             title: 'Тип',
-            dataIndex: 'type',
-            key: 'type',
-            render: (type) => <Tag>{getTypeName(type)}</Tag>
+            dataIndex: 'componentTypeId',
+            key: 'componentTypeId',
+            render: (_, record) => {
+                const typeId = record.componentTypeId || record.type;
+                return <Tag>{getTypeName(typeId)}</Tag>;
+            }
         },
         {
             title: 'Описание',

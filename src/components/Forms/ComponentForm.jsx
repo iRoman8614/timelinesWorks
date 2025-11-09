@@ -1,15 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Form, Input, Select, Button, Space } from 'antd';
 
 const ComponentForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
     const [form] = Form.useForm();
 
+    useEffect(() => {
+        if (initialValues) {
+            form.setFieldsValue({
+                name: initialValues.name,
+                description: initialValues.description,
+                componentTypeId: initialValues.componentTypeId || initialValues.type
+            });
+        } else {
+            form.resetFields();
+        }
+    }, [form, initialValues]);
+
     const handleFinish = (values) => {
         const componentData = {
             id: initialValues?.id || crypto.randomUUID(),
-            name: values.name,
-            description: values.description,
-            type: values.type
+            name: values.name?.trim(),
+            description: values.description?.trim() || '',
+            componentTypeId: values.componentTypeId
         };
         onSubmit(componentData);
         form.resetFields();
@@ -20,7 +32,6 @@ const ComponentForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
             form={form}
             layout="vertical"
             onFinish={handleFinish}
-            initialValues={initialValues}
         >
             <Form.Item
                 name="name"
@@ -31,7 +42,7 @@ const ComponentForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
             </Form.Item>
 
             <Form.Item
-                name="type"
+                name="componentTypeId"
                 label="Тип компонента"
                 rules={[{ required: true, message: 'Выберите тип' }]}
             >
@@ -54,7 +65,7 @@ const ComponentForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
             <Form.Item>
                 <Space>
                     <Button type="primary" htmlType="submit">
-                        Создать
+                        Сохранить
                     </Button>
                     <Button onClick={() => form.resetFields()}>
                         Очистить
