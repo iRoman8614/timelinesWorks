@@ -1,19 +1,12 @@
 import React, {useState, useMemo, useCallback} from 'react';
-import { Card, Modal, Descriptions, Collapse, message } from 'antd';
+import { Card } from 'antd';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
 import { getContrastTextColor } from '../../utils/contrastTextColor';
-import { UnitAssignmentForm, MaintenanceEventForm } from '../Forms';
-import { dataService } from '../../services/dataService';
 
-const { Panel } = Collapse;
-
-const TimelineTab = ({ project, onProjectUpdate }) => {
+const TimelineTab = ({ project }) => {
     const [zoom, setZoom] = useState(30);
-    const [trackStates, setTrackStates] = useState({});
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedElement, setSelectedElement] = useState(null);
 
     const getStateColor = (stateType) => {
         const colors = {
@@ -25,17 +18,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         return colors[stateType] || '#d9d9d9';
     };
 
-    const getMaintenanceColor = (maintenanceTypeOrName) => {
-        // Если передан объект с цветом
-        if (typeof maintenanceTypeOrName === 'object' && maintenanceTypeOrName?.color) {
-            return maintenanceTypeOrName.color;
-        }
-
-        // Если передано имя или у объекта нет цвета
-        const name = typeof maintenanceTypeOrName === 'string'
-            ? maintenanceTypeOrName
-            : maintenanceTypeOrName?.name;
-
+    const getMaintenanceColor = (maintenanceName) => {
         const colors = {
             'ТО двигателя': '#1890ff',
             'ТО компрессора': '#52c41a',
@@ -43,7 +26,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             'Замена фильтров': '#722ed1',
             'Проверка клапанов': '#f5222d'
         };
-        return colors[name] || '#8c8c8c';
+        return colors[maintenanceName] || '#8c8c8c';
     };
 
     const zoomIn = useCallback(() => {
@@ -56,88 +39,10 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
 
     const clickElement = useCallback((element) => {
         console.log('Clicked element:', element);
-        setSelectedElement(element);
-        setIsModalOpen(true);
-    }, []);
-
-    const handleModalClose = useCallback(() => {
-        setIsModalOpen(false);
-        setSelectedElement(null);
-    }, []);
-
-    const handleAddUnitAssignment = useCallback(async (assignmentData) => {
-        try {
-            // Добавляем новое назначение в timeline
-            const updatedProject = {
-                ...project,
-                timeline: {
-                    ...project.timeline,
-                    unitAssignments: [
-                        ...project.timeline.unitAssignments,
-                        assignmentData
-                    ]
-                }
-            };
-
-            await dataService.saveProject(project.id, updatedProject);
-
-            message.success('Деталь успешно назначена на агрегат');
-
-            if (onProjectUpdate) {
-                onProjectUpdate(updatedProject);
-            }
-        } catch (error) {
-            console.error('Ошибка при назначении детали:', error);
-            message.error('Ошибка при назначении детали');
-        }
-    }, [project, onProjectUpdate]);
-
-    const handleAddMaintenanceEvent = useCallback(async (eventData) => {
-        try {
-            const updatedProject = {
-                ...project,
-                timeline: {
-                    ...project.timeline,
-                    maintenanceEvents: [
-                        ...(project.timeline?.maintenanceEvents || []),
-                        eventData
-                    ]
-                }
-            };
-
-            await dataService.saveProject(project.id, updatedProject);
-
-            message.success('Работа успешно запланирована');
-
-            if (onProjectUpdate) {
-                onProjectUpdate(updatedProject);
-            }
-        } catch (error) {
-            console.error('Ошибка при планировании работы:', error);
-            message.error('Ошибка при планировании работы');
-        }
-    }, [project, onProjectUpdate]);
-
-    const formatDate = useCallback((date) => {
-        if (!date) return 'Не указано';
-        const d = new Date(date);
-        return d.toLocaleDateString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
-    }, []);
-
-    const toggleTrackOpen = useCallback((track) => {
-        setTrackStates(prev => ({
-            ...prev,
-            [track.id]: !prev[track.id]
-        }));
     }, []);
 
     const clickTrackButton = useCallback((track) => {
         console.log('Clicked track button:', track);
-        // Если нужно, можно добавить дополнительную логику здесь
     }, []);
 
     const customElementRenderer = useCallback(({ element, ...props }) => {
@@ -157,11 +62,11 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
 
     const { tracks, start, end } = useMemo(() => {
         if (!project || !project.nodes) {
-            return { tracks: [], start: new Date('2025-01-01'), end: new Date('2025-12-31') };
+            return { tracks: [], start: new Date('2024-01-01'), end: new Date('2024-12-31') };
         }
 
-        let minDate = new Date('2025-01-01');
-        let maxDate = new Date('2025-12-31');
+        let minDate = new Date('2024-01-01');
+        let maxDate = new Date('2024-12-31');
 
         const allTracks = [];
 
@@ -182,24 +87,14 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             return allMaintenanceTypes.find(mt => mt.id === maintenanceTypeId);
         };
 
-        // Функция для получения информации о Unit по ID
-        const getUnit = (unitId) => {
-            for (const partModel of project.partModels || []) {
-                const unit = partModel.units?.find(u => u.id === unitId);
-                if (unit) {
-                    return { ...unit, partModelName: partModel.name };
-                }
-            }
-            return null;
-        };
-
         // Рекурсивная функция для обработки узлов
         const processNode = (node) => {
             const track = {
                 id: node.id,
                 title: node.name,
                 elements: [],
-                tracks: []
+                tracks: [],
+                isOpen: true // Всегда открыт
             };
 
             if (node.children) {
@@ -214,11 +109,6 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                 });
             }
 
-            // Устанавливаем isOpen только если есть дочерние элементы
-            if (track.tracks.length > 0) {
-                track.isOpen = trackStates[node.id] !== undefined ? trackStates[node.id] : true;
-            }
-
             return track;
         };
 
@@ -228,7 +118,8 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                 id: assembly.id,
                 title: assembly.name,
                 elements: [],
-                tracks: []
+                tracks: [],
+                isOpen: true // Всегда открыт
             };
 
             // Получаем состояния агрегата
@@ -241,7 +132,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                 const stateStart = new Date(state.dateTime);
                 const stateEnd = assemblyStates[index + 1]
                     ? new Date(assemblyStates[index + 1].dateTime)
-                    : new Date('2025-12-31');
+                    : new Date('2024-12-31');
 
                 const startDateStr = stateStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
                 const endDateStr = stateEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
@@ -278,84 +169,24 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             const components = getComponentsForAssembly(assembly.assemblyTypeId);
 
             components.forEach(component => {
-                const componentId = `${assembly.id}-${component.id}`;
                 const componentTrack = {
-                    id: componentId,
+                    id: `${assembly.id}-${component.id}`,
                     title: component.name,
                     elements: [],
-                    tracks: []
+                    tracks: [],
+                    isOpen: true
                 };
 
-                const unitAssignments = project.timeline?.unitAssignments?.filter(
+                // Находим Unit, назначенный на этот компонент
+                const unitAssignment = project.timeline?.unitAssignments?.find(
                     ua => ua.componentOfAssembly?.assemblyId === assembly.id &&
                         ua.componentOfAssembly?.componentPath?.includes(component.id)
-                ) || [];
+                );
 
-                unitAssignments.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-
-                unitAssignments.forEach((unitAssignment, assignmentIndex) => {
-                    const assignmentStart = new Date(unitAssignment.dateTime);
-                    // Определяем конец периода назначения: либо дата следующего назначения, либо конец года
-                    const assignmentEnd = assignmentIndex < unitAssignments.length - 1
-                        ? new Date(unitAssignments[assignmentIndex + 1].dateTime)
-                        : new Date('2025-12-31');
-
-                    const currentUnit = getUnit(unitAssignment.unitId);
-                    const currentUnitName = currentUnit ? `${currentUnit.name} (${currentUnit.partModelName})` : 'Неизвестный юнит';
-
-                    const markerEnd = new Date(assignmentStart);
-                    markerEnd.setHours(markerEnd.getHours() + 1); // тонкая полоса
-
-                    if (assignmentStart < minDate) minDate = assignmentStart;
-                    if (assignmentEnd > maxDate) maxDate = assignmentEnd;
-
-                    let tooltip = `Назначение юнита\nЮнит: ${currentUnitName}\nДата: ${assignmentStart.toLocaleString('ru-RU')}`;
-                    let markerTitle = 'Назначение';
-
-                    if (assignmentIndex > 0) {
-                        const prevUnit = getUnit(unitAssignments[assignmentIndex - 1].unitId);
-                        const prevUnitName = prevUnit ? `${prevUnit.name} (${prevUnit.partModelName})` : 'Неизвестный юнит';
-                        const replacementDateStr = assignmentStart.toLocaleDateString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-
-                        tooltip = `Замена юнита\nДата: ${replacementDateStr}\nС: ${prevUnitName}\nНа: ${currentUnitName}`;
-                        markerTitle = 'Замена';
-                    }
-
-                    componentTrack.elements.push({
-                        id: `unit-assignment-${componentId}-${assignmentIndex}`,
-                        title: markerTitle,
-                        start: assignmentStart,
-                        end: markerEnd,
-                        style: {
-                            backgroundColor: '#ff9800',
-                            borderRadius: '2px',
-                            color: '#fff',
-                            fontSize: '10px',
-                            fontWeight: '700',
-                            border: '3px solid #f57c00',
-                            minWidth: '6px',
-                            width: '6px',
-                            zIndex: 100,
-                            boxShadow: '0 2px 6px rgba(255,152,0,0.5)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '2px'
-                        },
-                        dataTitle: tooltip
-                    });
-
-                    // Находим все MaintenanceEvent для этого Unit в период его назначения
+                if (unitAssignment) {
+                    // Находим все MaintenanceEvent для этого Unit
                     const maintenanceEvents = project.timeline?.maintenanceEvents?.filter(
-                        me => me.unitId === unitAssignment.unitId &&
-                            new Date(me.dateTime) >= assignmentStart &&
-                            new Date(me.dateTime) < assignmentEnd
+                        me => me.unitId === unitAssignment.unitId
                     ) || [];
 
                     maintenanceEvents.forEach(event => {
@@ -374,33 +205,28 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
 
                             componentTrack.elements.push({
                                 id: event.maintenanceTypeId + '-' + event.dateTime,
-                                title: maintenanceType.name,
+                                title: maintenanceType.name, // Короткое название для отображения
                                 start: eventStart,
                                 end: eventEnd,
                                 style: {
                                     backgroundColor: bgColor,
                                     borderRadius: '4px',
-                                    color: textColor,
+                                    color: textColor, // Контрастный цвет текста
                                     fontSize: '11px',
                                     fontWeight: '500',
                                     border: 'none'
                                 },
-                                dataTitle: tooltipText
+                                dataTitle: tooltipText // Для кастомного тултипа
                             });
 
                             if (eventStart < minDate) minDate = eventStart;
                             if (eventEnd > maxDate) maxDate = eventEnd;
                         }
                     });
-                });
+                }
 
                 assemblyTrack.tracks.push(componentTrack);
             });
-
-            // Устанавливаем isOpen только если есть дочерние элементы
-            if (assemblyTrack.tracks.length > 0) {
-                assemblyTrack.isOpen = trackStates[assembly.id] !== undefined ? trackStates[assembly.id] : true;
-            }
 
             return assemblyTrack;
         };
@@ -415,7 +241,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             start: minDate,
             end: maxDate
         };
-    }, [project, trackStates]);
+    }, [project]);
 
     const now = new Date();
 
@@ -450,18 +276,17 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             title: 'Месяцы',
             cells: Array.from({ length: 12 }, (_, i) => ({
                 id: `month-${i}`,
-                title: new Date(2025, i, 1).toLocaleDateString('ru-RU', { month: 'long' }),
-                start: new Date(2025, i, 1),
-                end: new Date(2025, i + 1, 1)
+                title: new Date(2024, i, 1).toLocaleDateString('ru-RU', { month: 'long' }),
+                start: new Date(2024, i, 1),
+                end: new Date(2024, i + 1, 1)
             })),
             style: {}
         },
         {
             id: 'days',
             title: 'Дни',
-            cells: generateDaysInRange(new Date('2025-01-01'), new Date('2025-12-31')),
-            style: {},
-            useAsGrid: true // Используем дни для генерации вертикальных линий сетки
+            cells: generateDaysInRange(new Date('2024-01-01'), new Date('2024-12-31')),
+            style: {}
         }
     ];
 
@@ -475,26 +300,6 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
 
     return (
         <div className="timeline-tab">
-            <Card
-                title="Назначение деталей на агрегаты"
-                style={{ marginBottom: 16 }}
-            >
-                <Collapse defaultActiveKey={[]}>
-                    <Panel header="Добавить назначение детали" key="1">
-                        <UnitAssignmentForm
-                            onSubmit={handleAddUnitAssignment}
-                            project={project}
-                        />
-                    </Panel>
-                    <Panel header="Добавить плановую работу" key="2">
-                        <MaintenanceEventForm
-                            onSubmit={handleAddMaintenanceEvent}
-                            project={project}
-                        />
-                    </Panel>
-                </Collapse>
-            </Card>
-
             <Card className="timeline-chart">
                 <div className="timeline-wrapper">
                     <Timeline
@@ -508,7 +313,6 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                         zoomOut={zoomOut}
                         clickElement={clickElement}
                         clickTrackButton={clickTrackButton}
-                        toggleTrackOpen={toggleTrackOpen}
                         timebar={timebar}
                         tracks={tracks}
                         now={now}
@@ -518,27 +322,6 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     />
                 </div>
             </Card>
-            <Modal
-                title="Информация о работе"
-                open={isModalOpen}
-                onCancel={handleModalClose}
-                footer={null}
-                width={600}
-            >
-                {selectedElement && (
-                    <Descriptions column={1} bordered>
-                        <Descriptions.Item label="Название работы">
-                            {selectedElement.title || selectedElement.dataTitle || 'Не указано'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Дата начала">
-                            {formatDate(selectedElement.start)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Дата окончания">
-                            {formatDate(selectedElement.end)}
-                        </Descriptions.Item>
-                    </Descriptions>
-                )}
-            </Modal>
         </div>
     );
 };

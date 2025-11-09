@@ -5,7 +5,6 @@ import ComponentForm from "./ComponentForm";
 import ComponentTypeForm from "./ComponentTypeForm";
 import PartModelForm from "./PartModelForm";
 import MaintenanceTypeForm from "./MaintenanceTypeForm";
-import MaintenanceEventForm from "./MaintenanceEventForm";
 import UnitForm from "./UnitForm";
 import NodeConditionForm from "./NodeConditionForm";
 import UnitAssignmentForm from "./UnitAssignmentForm";
@@ -18,7 +17,6 @@ export {
     ComponentTypeForm,
     PartModelForm,
     MaintenanceTypeForm,
-    MaintenanceEventForm,
     UnitForm,
     NodeConditionForm,
     UnitAssignmentForm

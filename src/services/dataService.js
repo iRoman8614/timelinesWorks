@@ -7,56 +7,6 @@ class DataService {
         this.initializeStorage();
     }
 
-    normalizeNodes(nodes = []) {
-        return (nodes || []).map(node => {
-            const normalizedChildren = this.normalizeNodes(node.children || []);
-
-            const isAssemblyTypeString = typeof node.type === 'string'
-                && node.type !== 'ASSEMBLY'
-                && node.type !== 'assembly'
-                && node.type !== 'NODE'
-                && node.type !== 'node'
-                && node.type !== 'folder'
-                && node.type !== 'project';
-
-            const inferredAssemblyTypeId = node.assemblyTypeId
-                || (isAssemblyTypeString ? node.type : undefined);
-
-            const isAssembly = node.type === 'ASSEMBLY'
-                || node.type === 'assembly'
-                || Boolean(inferredAssemblyTypeId);
-
-            let normalizedType = node.type;
-            if (isAssembly) {
-                normalizedType = 'ASSEMBLY';
-            } else if (normalizedType === 'node') {
-                normalizedType = 'NODE';
-            }
-
-            return {
-                ...node,
-                type: normalizedType,
-                assemblyTypeId: inferredAssemblyTypeId,
-                children: normalizedChildren
-            };
-        });
-    }
-
-    normalizeAssemblyTypes(assemblyTypes = []) {
-        return (assemblyTypes || []).map(assemblyType => ({
-            ...assemblyType,
-            components: (assemblyType.components || []).map(component => {
-                const componentTypeId = component.componentTypeId || component.type;
-                const { type, ...rest } = component;
-
-                return {
-                    ...rest,
-                    componentTypeId
-                };
-            })
-        }));
-    }
-
     initializeStorage() {
         const existingTree = localStorage.getItem(this.STRUCTURE_TREE_KEY);
         // if (!existingTree) {
@@ -101,14 +51,6 @@ class DataService {
                         ...pm,
                         units: pm.units || []
                     }));
-                }
-
-                if (parsedProject.assemblyTypes) {
-                    parsedProject.assemblyTypes = this.normalizeAssemblyTypes(parsedProject.assemblyTypes);
-                }
-
-                if (parsedProject.nodes) {
-                    parsedProject.nodes = this.normalizeNodes(parsedProject.nodes);
                 }
 
                 resolve(parsedProject);
