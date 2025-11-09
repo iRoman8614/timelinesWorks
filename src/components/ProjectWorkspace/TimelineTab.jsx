@@ -351,6 +351,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                 });
 
                 // Определяем активный Unit для компонента на каждый период
+// Определяем активный Unit для компонента на каждый период
                 assignmentsForComponent.forEach((assignment, index) => {
                     const activeUnitId = assignment.unitId;
 
@@ -392,6 +393,43 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     });
                 });
 
+// ДОБАВИТЬ ЭТОТ НОВЫЙ БЛОК - для событий с виртуальным unitId (привязанных к компоненту)
+                const virtualUnitId = `component-${component.id}`;
+                const componentMaintenanceEvents = timeline.maintenanceEvents?.filter(
+                    me => me.unitId === virtualUnitId
+                ) || [];
+
+                componentMaintenanceEvents.forEach(event => {
+                    const maintenanceType = getMaintenanceType(event.maintenanceTypeId);
+                    if (maintenanceType) {
+                        const eventStart = new Date(event.dateTime);
+                        const eventEnd = new Date(eventStart);
+                        eventEnd.setDate(eventEnd.getDate() + maintenanceType.duration);
+
+                        const startDateStr = eventStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+                        const endDateStr = eventEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+                        const tooltipText = `${maintenanceType.name}\n${startDateStr} - ${endDateStr}\nДлительность: ${maintenanceType.duration} дн.`;
+
+                        const bgColor = getMaintenanceColor(maintenanceType);
+                        const textColor = getContrastTextColor(bgColor);
+
+                        componentTrack.elements.push({
+                            id: event.maintenanceTypeId + '-' + event.dateTime,
+                            title: maintenanceType.name,
+                            start: eventStart,
+                            end: eventEnd,
+                            style: {
+                                backgroundColor: bgColor,
+                                borderRadius: '4px',
+                                color: textColor,
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                border: 'none'
+                            },
+                            dataTitle: tooltipText
+                        });
+                    }
+                });
                 assemblyTrack.tracks.push(componentTrack);
             });
 
