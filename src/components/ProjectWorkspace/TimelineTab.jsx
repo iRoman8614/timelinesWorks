@@ -1,11 +1,15 @@
 import React, {useState, useMemo, useCallback} from 'react';
-import { Card, Modal, Descriptions } from 'antd';
+import { Card, Modal, Descriptions, Collapse, message } from 'antd';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
 import { getContrastTextColor } from '../../utils/contrastTextColor';
+import { UnitAssignmentForm } from '../Forms';
+import { dataService } from '../../services/dataService';
 
-const TimelineTab = ({ project }) => {
+const { Panel } = Collapse;
+
+const TimelineTab = ({ project, onProjectUpdate }) => {
     const [zoom, setZoom] = useState(30);
     const [trackStates, setTrackStates] = useState({});
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,7 +25,17 @@ const TimelineTab = ({ project }) => {
         return colors[stateType] || '#d9d9d9';
     };
 
-    const getMaintenanceColor = (maintenanceName) => {
+    const getMaintenanceColor = (maintenanceTypeOrName) => {
+        // Если передан объект с цветом
+        if (typeof maintenanceTypeOrName === 'object' && maintenanceTypeOrName?.color) {
+            return maintenanceTypeOrName.color;
+        }
+
+        // Если передано имя или у объекта нет цвета
+        const name = typeof maintenanceTypeOrName === 'string'
+            ? maintenanceTypeOrName
+            : maintenanceTypeOrName?.name;
+
         const colors = {
             'ТО двигателя': '#1890ff',
             'ТО компрессора': '#52c41a',
@@ -29,7 +43,7 @@ const TimelineTab = ({ project }) => {
             'Замена фильтров': '#722ed1',
             'Проверка клапанов': '#f5222d'
         };
-        return colors[maintenanceName] || '#8c8c8c';
+        return colors[name] || '#8c8c8c';
     };
 
     const zoomIn = useCallback(() => {
@@ -50,6 +64,33 @@ const TimelineTab = ({ project }) => {
         setIsModalOpen(false);
         setSelectedElement(null);
     }, []);
+
+    const handleAddUnitAssignment = useCallback(async (assignmentData) => {
+        try {
+            // Добавляем новое назначение в timeline
+            const updatedProject = {
+                ...project,
+                timeline: {
+                    ...project.timeline,
+                    unitAssignments: [
+                        ...project.timeline.unitAssignments,
+                        assignmentData
+                    ]
+                }
+            };
+
+            await dataService.saveProject(project.id, updatedProject);
+
+            message.success('Деталь успешно назначена на агрегат');
+
+            if (onProjectUpdate) {
+                onProjectUpdate(updatedProject);
+            }
+        } catch (error) {
+            console.error('Ошибка при назначении детали:', error);
+            message.error('Ошибка при назначении детали');
+        }
+    }, [project, onProjectUpdate]);
 
     const formatDate = useCallback((date) => {
         if (!date) return 'Не указано';
@@ -219,7 +260,7 @@ const TimelineTab = ({ project }) => {
                     tracks: []
                 };
 
-               const unitAssignments = project.timeline?.unitAssignments?.filter(
+                const unitAssignments = project.timeline?.unitAssignments?.filter(
                     ua => ua.componentOfAssembly?.assemblyId === assembly.id &&
                         ua.componentOfAssembly?.componentPath?.includes(component.id)
                 ) || [];
@@ -236,25 +277,25 @@ const TimelineTab = ({ project }) => {
                     if (assignmentIndex > 0) {
                         const prevUnit = getUnit(unitAssignments[assignmentIndex - 1].unitId);
                         const currentUnit = getUnit(unitAssignment.unitId);
-                        
+
                         const prevUnitName = prevUnit ? `${prevUnit.name} (${prevUnit.partModelName})` : 'Неизвестный юнит';
                         const currentUnitName = currentUnit ? `${currentUnit.name} (${currentUnit.partModelName})` : 'Неизвестный юнит';
-                        
-                        const replacementDateStr = assignmentStart.toLocaleDateString('ru-RU', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
+
+                        const replacementDateStr = assignmentStart.toLocaleDateString('ru-RU', {
+                            day: '2-digit',
+                            month: '2-digit',
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit'
                         });
-                        
+
                         const replacementTooltip = `Замена юнита\nДата: ${replacementDateStr}\nС: ${prevUnitName}\nНа: ${currentUnitName}`;
 
                         // Добавляем маркер замены юнита (вертикальная линия)
                         // Используем минимальную длительность для отображения вертикальной линии
                         const markerEnd = new Date(assignmentStart);
                         markerEnd.setHours(markerEnd.getHours() + 1); // 1 час для видимости
-                        
+
                         componentTrack.elements.push({
                             id: `unit-replacement-${componentId}-${assignmentIndex}`,
                             title: 'Замена',
@@ -404,6 +445,20 @@ const TimelineTab = ({ project }) => {
 
     return (
         <div className="timeline-tab">
+            <Card
+                title="Назначение деталей на агрегаты"
+                style={{ marginBottom: 16 }}
+            >
+                <Collapse defaultActiveKey={[]}>
+                    <Panel header="Добавить назначение детали" key="1">
+                        <UnitAssignmentForm
+                            onSubmit={handleAddUnitAssignment}
+                            project={project}
+                        />
+                    </Panel>
+                </Collapse>
+            </Card>
+
             <Card className="timeline-chart">
                 <div className="timeline-wrapper">
                     <Timeline

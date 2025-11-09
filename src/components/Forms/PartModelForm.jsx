@@ -11,7 +11,8 @@ const PartModelForm = ({ onSubmit, initialValues }) => {
             description: values.description,
             uid: values.uid,
             specification: values.specification,
-            maintenanceTypes: []
+            maintenanceTypes: [],
+            units: []
         };
         onSubmit(partModelData);
         form.resetFields();

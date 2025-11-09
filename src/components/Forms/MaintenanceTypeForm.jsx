@@ -1,8 +1,9 @@
-import React from 'react';
-import { Form, Input, InputNumber, Button, Space } from 'antd';
+import React, { useState } from 'react';
+import { Form, Input, InputNumber, Button, Space, ColorPicker } from 'antd';
 
 const MaintenanceTypeForm = ({ onSubmit, initialValues }) => {
     const [form] = Form.useForm();
+    const [color, setColor] = useState(initialValues?.color || '#1890ff');
 
     const handleFinish = (values) => {
         const maintenanceTypeData = {
@@ -13,10 +14,12 @@ const MaintenanceTypeForm = ({ onSubmit, initialValues }) => {
             priority: values.priority,
             interval: values.interval,
             deviation: values.deviation,
+            color: typeof color === 'string' ? color : color.toHexString(),
             children: []
         };
         onSubmit(maintenanceTypeData);
         form.resetFields();
+        setColor('#1890ff');
     };
 
     return (
@@ -32,6 +35,16 @@ const MaintenanceTypeForm = ({ onSubmit, initialValues }) => {
                 rules={[{ required: true, message: 'Введите название' }]}
             >
                 <Input placeholder="Название типа обслуживания" />
+            </Form.Item>
+
+            <Form.Item
+                label="Цвет на таймлайне"
+            >
+                <ColorPicker
+                    value={color}
+                    onChange={(value) => setColor(value)}
+                    showText
+                />
             </Form.Item>
 
             <Form.Item
@@ -75,9 +88,12 @@ const MaintenanceTypeForm = ({ onSubmit, initialValues }) => {
             <Form.Item>
                 <Space>
                     <Button type="primary" htmlType="submit">
-                        Создать
+                        {initialValues ? 'Обновить' : 'Создать'}
                     </Button>
-                    <Button onClick={() => form.resetFields()}>
+                    <Button onClick={() => {
+                        form.resetFields();
+                        setColor('#1890ff');
+                    }}>
                         Очистить
                     </Button>
                 </Space>

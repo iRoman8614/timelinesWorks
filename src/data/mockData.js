@@ -621,18 +621,4 @@ export const mockProjects = {
             maintenanceEvents: []
         }
     },
-    'project-warehouse': {
-        id: 'project-warehouse',
-        name: 'Проект Склад-1',
-        description: 'Складское оборудование',
-        assemblyTypes: [],
-        componentTypes: [],
-        partModels: [],
-        nodes: [],
-        timeline: {
-            assemblyStates: [],
-            unitAssignments: [],
-            maintenanceEvents: []
-        }
-    }
 };

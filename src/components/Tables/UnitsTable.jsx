@@ -19,9 +19,9 @@ const UnitsTable = ({ units, onEdit, onDelete, partModels = [] }) => {
         },
         {
             title: 'Модель детали',
-            dataIndex: 'partModel',
-            key: 'partModel',
-            render: (partModel) => <Tag color="green">{getPartModelName(partModel)}</Tag>
+            dataIndex: 'partModelId',
+            key: 'partModelId',
+            render: (partModelId) => <Tag color="green">{getPartModelName(partModelId)}</Tag>
         },
         {
             title: 'Серийный номер',
@@ -30,10 +30,17 @@ const UnitsTable = ({ units, onEdit, onDelete, partModels = [] }) => {
             render: (serialNumber) => <Text code>{serialNumber}</Text>
         },
         {
+            title: 'Дата производства',
+            dataIndex: 'manufactureDate',
+            key: 'manufactureDate',
+            render: (date) => date ? <Text>{date}</Text> : <Text type="secondary">-</Text>
+        },
+        {
             title: 'Описание',
             dataIndex: 'description',
             key: 'description',
-            ellipsis: true
+            ellipsis: true,
+            render: (text) => text || <Text type="secondary">-</Text>
         },
         {
             title: 'UUID',

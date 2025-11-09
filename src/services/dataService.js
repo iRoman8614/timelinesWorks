@@ -43,7 +43,17 @@ class DataService {
         return new Promise((resolve, reject) => {
             const project = localStorage.getItem(this.STORAGE_KEY_PREFIX + projectId);
             if (project) {
-                resolve(JSON.parse(project));
+                const parsedProject = JSON.parse(project);
+                console.log('project', parsedProject)
+                // Миграция данных: добавление units[] в partModels, если их нет
+                if (parsedProject.partModels) {
+                    parsedProject.partModels = parsedProject.partModels.map(pm => ({
+                        ...pm,
+                        units: pm.units || []
+                    }));
+                }
+
+                resolve(parsedProject);
             } else {
                 reject(new Error('Project not found'));
             }

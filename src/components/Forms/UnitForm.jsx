@@ -8,9 +8,10 @@ const UnitForm = ({ onSubmit, initialValues, partModels = [] }) => {
         const unitData = {
             id: initialValues?.id || crypto.randomUUID(),
             name: values.name,
-            description: values.description,
-            partModel: values.partModel,
-            serialNumber: values.serialNumber
+            description: values.description || '',
+            partModelId: values.partModelId, // Изменено с partModel на partModelId
+            serialNumber: values.serialNumber,
+            manufactureDate: values.manufactureDate || null
         };
         onSubmit(unitData);
         form.resetFields();
@@ -32,7 +33,7 @@ const UnitForm = ({ onSubmit, initialValues, partModels = [] }) => {
             </Form.Item>
 
             <Form.Item
-                name="partModel"
+                name="partModelId"
                 label="Модель детали"
                 rules={[{ required: true, message: 'Выберите модель' }]}
             >
@@ -51,6 +52,16 @@ const UnitForm = ({ onSubmit, initialValues, partModels = [] }) => {
                 rules={[{ required: true, message: 'Введите серийный номер' }]}
             >
                 <Input placeholder="Серийный номер детали" />
+            </Form.Item>
+
+            <Form.Item
+                name="manufactureDate"
+                label="Дата производства"
+            >
+                <Input
+                    type="date"
+                    placeholder="Выберите дату производства"
+                />
             </Form.Item>
 
             <Form.Item

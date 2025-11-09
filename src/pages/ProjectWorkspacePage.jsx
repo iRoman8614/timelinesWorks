@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Typography, Button, Spin, Tabs, message, Modal, Space, Collapse } from 'antd';
-import { ArrowLeftOutlined, SaveOutlined, SendOutlined, PlusOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {Layout, Typography, Button, Spin, Tabs, message, Modal, Space, Collapse, Table} from 'antd';
+import { ArrowLeftOutlined, SaveOutlined, SendOutlined, PlusOutlined } from '@ant-design/icons';
 import { dataService } from '../services/dataService';
 import TimelineTab from '../components/ProjectWorkspace/TimelineTab';
 import InstructionBlock from '../components/ProjectWorkspace/InstructionBlock';
@@ -163,28 +163,25 @@ const ProjectWorkspacePage = () => {
     };
 
     const handleAddPartModel = (data) => {
+        const partModelWithUnits = {
+            ...data,
+            units: [] // Инициализация пустого массива units
+        };
         const updated = {
             ...project,
-            partModels: [...project.partModels, data]
+            partModels: [...project.partModels, partModelWithUnits]
         };
         updateProject(updated);
         setActiveModal(null);
     };
 
     const handleDeletePartModel = (record) => {
-        Modal.confirm({
-            title: 'Удалить модель детали?',
-            okText: 'Удалить',
-            cancelText: 'Отмена',
-            okButtonProps: { danger: true },
-            onOk: () => {
-                const updated = {
-                    ...project,
-                    partModels: project.partModels.filter(item => item.id !== record.id)
-                };
-                updateProject(updated);
-            }
-        });
+        const updated = {
+            ...project,
+            partModels: project.partModels.filter(item => item.id !== record.id)
+        };
+        updateProject(updated);
+        message.success(`Модель детали "${record.name}" удалена`);
     };
 
     const handleManageMaintenance = (partModel) => {
@@ -195,6 +192,39 @@ const ProjectWorkspacePage = () => {
     const handleManageUnits = (partModel) => {
         setSelectedItem(partModel);
         setActiveModal('units');
+    };
+
+    const handleAddUnit = (data) => {
+        const updated = {
+            ...project,
+            partModels: project.partModels.map(pm =>
+                pm.id === selectedItem.id
+                    ? { ...pm, units: [...(pm.units || []), data] }
+                    : pm
+            )
+        };
+        updateProject(updated);
+        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
+        message.success(`Деталь "${data.name}" добавлена`);
+    };
+
+    const handleManageConditions = (node) => {
+        setSelectedItem(node);
+        setActiveModal('conditions');
+    };
+
+    const handleDeleteUnit = (unit) => {
+        const updated = {
+            ...project,
+            partModels: project.partModels.map(pm =>
+                pm.id === selectedItem.id
+                    ? { ...pm, units: (pm.units || []).filter(u => u.id !== unit.id) }
+                    : pm
+            )
+        };
+        updateProject(updated);
+        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
+        message.success(`Деталь "${unit.name}" удалена`);
     };
 
     const handleAddMaintenanceType = (data) => {
@@ -221,32 +251,6 @@ const ProjectWorkspacePage = () => {
             partModels: project.partModels.map(pm =>
                 pm.id === selectedItem.id
                     ? { ...pm, maintenanceTypes: pm.maintenanceTypes.filter(mt => mt.id !== maintenanceType.id) }
-                    : pm
-            )
-        };
-        updateProject(updated);
-        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
-    };
-
-    const handleAddUnit = (data) => {
-        const updated = {
-            ...project,
-            partModels: project.partModels.map(pm =>
-                pm.id === selectedItem.id
-                    ? { ...pm, units: [...pm.units, data] }
-                    : pm
-            )
-        };
-        updateProject(updated);
-        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
-    };
-
-    const handleDeleteUnit = (unit) => {
-        const updated = {
-            ...project,
-            partModels: project.partModels.map(pm =>
-                pm.id === selectedItem.id
-                    ? { ...pm, units: pm.units.filter(u => u.id !== unit.id) }
                     : pm
             )
         };
@@ -289,22 +293,25 @@ const ProjectWorkspacePage = () => {
         updateProject(updated);
     };
 
-    const handleDeleteNode = (node) => {
+    const handleDeleteNode = (nodeToDelete) => {
+        const deleteFromNodes = (nodes) => {
+            return nodes.filter(node => {
+                if (node.id === nodeToDelete.id) {
+                    return false;
+                }
+                if (node.children) {
+                    node.children = deleteFromNodes(node.children);
+                }
+                return true;
+            });
+        };
+
         const updated = {
             ...project,
-            nodes: project.nodes.map(pm =>
-                pm.id === node.id
-                    ? { ...pm, nodes: pm.nodes.filter(mt => mt.id !== node.id) }
-                    : pm
-            )
+            nodes: deleteFromNodes(project.nodes)
         };
         updateProject(updated);
-        setSelectedItem(updated.nodes.find(pm => pm.id === node.id));
-    };
-
-    const handleManageConditions = (node) => {
-        setSelectedItem(node);
-        setActiveModal('conditions');
+        message.success(`Узел "${nodeToDelete.name}" удален`);
     };
 
     const handleEditComponentType = (record) => {
@@ -315,6 +322,11 @@ const ProjectWorkspacePage = () => {
     const handleEditAssemblyType = (record) => {
         setEditingItem(record);
         setActiveModal('editAssemblyType');
+    };
+
+    const handleEditNode = (node) => {
+        setEditingItem(node);
+        setActiveModal('editNode');
     };
 
     const handleAddCondition = (data) => {
@@ -392,7 +404,12 @@ const ProjectWorkspacePage = () => {
         {
             key: 'timeline',
             label: 'Таймлайн',
-            children: <TimelineTab project={project} />
+            children: <TimelineTab
+                project={project}
+                onProjectUpdate={updateProject}
+            />
+
+                //<TimelineTab project={project} onUpdateProject={updateProject} />
         },
         {
             key: 'configurator',
@@ -514,7 +531,7 @@ const ProjectWorkspacePage = () => {
                         >
                             <NodesTable
                                 nodes={project.nodes}
-                                onEdit={(record) => console.log('Edit', record)}
+                                onEdit={handleEditNode}
                                 onDelete={handleDeleteNode}
                                 onAddChild={handleAddChildClick}
                                 onManageConditions={handleManageConditions}
@@ -522,6 +539,123 @@ const ProjectWorkspacePage = () => {
                             />
                         </Panel>
                     </Collapse>
+                    {/* Unit Assignments */}
+                    <Panel header={`Назначения деталей (${project.timeline?.unitAssignments?.length || 0})`} key="unitAssignments">
+                        <Table
+                            columns={[
+                                {
+                                    title: 'Дата и время',
+                                    dataIndex: 'dateTime',
+                                    key: 'dateTime',
+                                    render: (dateTime) => new Date(dateTime).toLocaleString('ru-RU'),
+                                    sorter: (a, b) => new Date(a.dateTime) - new Date(b.dateTime)
+                                },
+                                {
+                                    title: 'Деталь',
+                                    dataIndex: 'unitId',
+                                    key: 'unitId',
+                                    render: (unitId) => {
+                                        // Находим unit по ID
+                                        for (const partModel of project.partModels || []) {
+                                            const unit = partModel.units?.find(u => u.id === unitId);
+                                            if (unit) {
+                                                return `${unit.name} - ${unit.serialNumber}`;
+                                            }
+                                        }
+                                        return unitId;
+                                    }
+                                },
+                                {
+                                    title: 'Агрегат',
+                                    dataIndex: ['componentOfAssembly', 'assemblyId'],
+                                    key: 'assemblyId',
+                                    render: (assemblyId) => {
+                                        // Функция поиска агрегата по ID в дереве нод
+                                        const findAssembly = (nodes) => {
+                                            for (const node of nodes) {
+                                                if (node.children) {
+                                                    for (const child of node.children) {
+                                                        if (child.type === 'ASSEMBLY' && child.id === assemblyId) {
+                                                            return child;
+                                                        }
+                                                        if (child.type === 'NODE' && child.children) {
+                                                            const found = findAssembly([child]);
+                                                            if (found) return found;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            return null;
+                                        };
+
+                                        const assembly = findAssembly(project.nodes || []);
+                                        return assembly ? assembly.name : assemblyId;
+                                    }
+                                },
+                                {
+                                    title: 'Компонент',
+                                    dataIndex: ['componentOfAssembly', 'componentPath'],
+                                    key: 'componentPath',
+                                    render: (path) => {
+                                        if (!path || path.length === 0) return '-';
+
+                                        // Находим имя компонента по его ID
+                                        const componentId = path[0];
+                                        for (const assemblyType of project.assemblyTypes || []) {
+                                            const component = assemblyType.components?.find(c => c.id === componentId);
+                                            if (component) {
+                                                return component.name;
+                                            }
+                                        }
+                                        return path.join(' → ');
+                                    }
+                                },
+                                {
+                                    title: 'Действия',
+                                    key: 'actions',
+                                    render: (_, record) => (
+                                        <Button
+                                            type="link"
+                                            danger
+                                            onClick={() => {
+                                                Modal.confirm({
+                                                    title: 'Удалить назначение детали?',
+                                                    okText: 'Удалить',
+                                                    cancelText: 'Отмена',
+                                                    okButtonProps: { danger: true },
+                                                    onOk: () => {
+                                                        const updatedAssignments = project.timeline.unitAssignments.filter(
+                                                            ua => !(ua.unitId === record.unitId &&
+                                                                ua.dateTime === record.dateTime)
+                                                        );
+
+                                                        const updated = {
+                                                            ...project,
+                                                            timeline: {
+                                                                ...project.timeline,
+                                                                unitAssignments: updatedAssignments
+                                                            }
+                                                        };
+
+                                                        updateProject(updated);
+                                                        message.success('Назначение удалено');
+                                                    }
+                                                });
+                                            }}
+                                        >
+                                            Удалить
+                                        </Button>
+                                    ),
+                                }
+                            ]}
+                            dataSource={project.timeline?.unitAssignments || []}
+                            rowKey={(record) => `${record.unitId}-${record.dateTime}`}
+                            pagination={false}
+                            locale={{
+                                emptyText: 'Нет назначений деталей'
+                            }}
+                        />
+                    </Panel>
                 </div>
             )
         }
@@ -758,11 +892,18 @@ const ProjectWorkspacePage = () => {
                 width={1000}
             >
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                    <UnitForm onSubmit={handleAddUnit} />
+                    <UnitForm
+                        onSubmit={handleAddUnit}
+                        partModels={project.partModels}
+                    />
                     <UnitsTable
                         units={selectedItem?.units || []}
-                        onEdit={(record) => console.log('Edit', record)}
+                        onEdit={(record) => {
+                            setEditingItem(record);
+                            setActiveModal('editPartModel');
+                        }}
                         onDelete={handleDeleteUnit}
+                        partModels={project.partModels}
                     />
                 </Space>
             </Modal>
@@ -802,6 +943,72 @@ const ProjectWorkspacePage = () => {
                         Добавить агрегат
                     </Button>
                 </Space>
+            </Modal>
+
+            <Modal
+                title="Редактировать модель детали"
+                open={activeModal === 'editPartModel'}
+                onCancel={() => {
+                    setActiveModal(null);
+                    setEditingItem(null);
+                }}
+                footer={null}
+                width={600}
+            >
+                <PartModelForm
+                    initialValues={editingItem}
+                    onSubmit={(data) => {
+                        const updated = {
+                            ...project,
+                            partModels: project.partModels.map(pm =>
+                                pm.id === editingItem.id
+                                    ? { ...pm, ...data }
+                                    : pm
+                            )
+                        };
+                        updateProject(updated);
+                        setActiveModal(null);
+                        setEditingItem(null);
+                        message.success('Модель детали обновлена');
+                    }}
+                />
+            </Modal>
+
+            <Modal
+                title="Редактировать узел"
+                open={activeModal === 'editNode'}
+                onCancel={() => {
+                    setActiveModal(null);
+                    setEditingItem(null);
+                }}
+                footer={null}
+                width={600}
+            >
+                <NodeForm
+                    initialValues={editingItem}
+                    onSubmit={(data) => {
+                        const updateNodeInTree = (nodes) => {
+                            return nodes.map(node => {
+                                if (node.id === editingItem.id) {
+                                    return { ...node, ...data, children: node.children };
+                                }
+                                if (node.children) {
+                                    return { ...node, children: updateNodeInTree(node.children) };
+                                }
+                                return node;
+                            });
+                        };
+
+                        const updated = {
+                            ...project,
+                            nodes: updateNodeInTree(project.nodes)
+                        };
+                        updateProject(updated);
+                        setActiveModal(null);
+                        setEditingItem(null);
+                        message.success('Узел обновлен');
+                    }}
+                />
             </Modal>
 
             <Modal

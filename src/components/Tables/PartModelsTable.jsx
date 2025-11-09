@@ -5,12 +5,13 @@ import {
     DeleteOutlined,
     CheckOutlined,
     CloseOutlined,
-    AppstoreOutlined
+    AppstoreOutlined,
+    InboxOutlined
 } from '@ant-design/icons';
 
 const { Text } = Typography;
 
-const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance }) => {
+const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance, onManageUnits }) => {
     const [deletingId, setDeletingId] = useState(null);
 
     const handleDeleteClick = (record) => {
@@ -53,6 +54,14 @@ const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance }) 
             )
         },
         {
+            title: 'Кол-во деталей',
+            dataIndex: 'units',
+            key: 'units',
+            render: (units) => (
+                <span>{units?.length || 0}</span>
+            )
+        },
+        {
             title: 'Описание',
             dataIndex: 'description',
             key: 'description',
@@ -68,7 +77,7 @@ const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance }) 
         {
             title: (record) => deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
-            width: 240,
+            width: 280,
             render: (_, record) => {
                 if (deletingId === record.id) {
                     return (
@@ -99,19 +108,31 @@ const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance }) 
                             size="small"
                             icon={<AppstoreOutlined />}
                             onClick={() => onManageMaintenance(record)}
+                            title="Управление типами ТО"
                         >
                             Работы
                         </Button>
                         <Button
                             size="small"
+                            icon={<InboxOutlined />}
+                            onClick={() => onManageUnits(record)}
+                            style={{ color: '#52c41a', borderColor: '#52c41a' }}
+                            title="Управление деталями"
+                        >
+                            Детали
+                        </Button>
+                        <Button
+                            size="small"
                             icon={<EditOutlined />}
                             onClick={() => onEdit(record)}
+                            title="Редактировать"
                         />
                         <Button
                             size="small"
                             danger
                             icon={<DeleteOutlined />}
                             onClick={() => handleDeleteClick(record)}
+                            title="Удалить"
                         />
                     </Space>
                 );
