@@ -2,8 +2,44 @@
     width: 100%;
 }
 
-.timeline-filters {
-    background: #fff;
+.timeline-controls-card {
+    margin-bottom: 16px;
+}
+
+.timeline-controls-card .ant-card-body {
+    padding: 16px;
+}
+
+.timeline-assignment-card {
+    margin-bottom: 16px;
+}
+
+.timeline-assignment-card .ant-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+}
+
+.timeline-assignment-title {
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.timeline-assignment-form .ant-form-item {
+    margin-bottom: 12px;
+}
+
+.timeline-range-controls {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.timeline-range-label {
+    font-weight: 500;
+    padding-top: 6px;
 }
 
 .timeline-chart {
@@ -17,6 +53,11 @@
 .timeline-wrapper {
     overflow-x: auto;
     overflow-y: visible;
+}
+
+.timeline-empty-state {
+    padding: 48px 24px;
+    text-align: center;
 }
 
 /* Кастомизация react-timelines под Ant Design стиль */

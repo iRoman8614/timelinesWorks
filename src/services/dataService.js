@@ -1,5 +1,14 @@
 import { mockProjects } from '../data/mockData';
 
+const getDefaultTimelineRange = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    return {
+        start: `${year}-01-01`,
+        end: `${year}-12-31`
+    };
+};
+
 class DataService {
     constructor() {
         this.STORAGE_KEY_PREFIX = 'project_';
@@ -41,7 +50,8 @@ class DataService {
 
     getProject(projectId) {
         return new Promise((resolve, reject) => {
-            const project = localStorage.getItem(this.STORAGE_KEY_PREFIX + projectId);
+            const storageKey = this.STORAGE_KEY_PREFIX + projectId;
+            const project = localStorage.getItem(storageKey);
             if (project) {
                 const parsedProject = JSON.parse(project);
                 console.log('project', parsedProject)
@@ -49,8 +59,52 @@ class DataService {
                 if (parsedProject.partModels) {
                     parsedProject.partModels = parsedProject.partModels.map(pm => ({
                         ...pm,
-                        units: pm.units || []
+                        componentTypeId: pm.componentTypeId || null,
+                        units: (pm.units || []).map(unit => ({
+                            ...unit,
+                            partModelId: unit.partModelId || pm.id
+                        }))
                     }));
+                }
+
+                const defaultTimelineRange = getDefaultTimelineRange();
+                let timelineUpdated = false;
+
+                if (!parsedProject.timeline) {
+                    parsedProject.timeline = {
+                        start: defaultTimelineRange.start,
+                        end: defaultTimelineRange.end,
+                        assemblyStates: [],
+                        unitAssignments: [],
+                        maintenanceEvents: []
+                    };
+                    timelineUpdated = true;
+                } else {
+                    const { timeline } = parsedProject;
+                    if (!timeline.start) {
+                        timeline.start = defaultTimelineRange.start;
+                        timelineUpdated = true;
+                    }
+                    if (!timeline.end) {
+                        timeline.end = defaultTimelineRange.end;
+                        timelineUpdated = true;
+                    }
+                    if (!Array.isArray(timeline.assemblyStates)) {
+                        timeline.assemblyStates = [];
+                        timelineUpdated = true;
+                    }
+                    if (!Array.isArray(timeline.unitAssignments)) {
+                        timeline.unitAssignments = [];
+                        timelineUpdated = true;
+                    }
+                    if (!Array.isArray(timeline.maintenanceEvents)) {
+                        timeline.maintenanceEvents = [];
+                        timelineUpdated = true;
+                    }
+                }
+
+                if (timelineUpdated) {
+                    localStorage.setItem(storageKey, JSON.stringify(parsedProject));
                 }
 
                 resolve(parsedProject);
@@ -72,6 +126,11 @@ class DataService {
 
     createProject(projectData) {
         return new Promise((resolve) => {
+            const defaultTimelineRange = getDefaultTimelineRange();
+            const providedTimeline = projectData.timeline || {};
+            const timelineStart = providedTimeline.start || defaultTimelineRange.start;
+            const timelineEnd = providedTimeline.end || defaultTimelineRange.end;
+
             const newProject = {
                 ...projectData,
                 assemblyTypes: [],
@@ -79,6 +138,8 @@ class DataService {
                 partModels: [],
                 nodes: [],
                 timeline: {
+                    start: timelineStart,
+                    end: timelineEnd,
                     assemblyStates: [],
                     unitAssignments: [],
                     maintenanceEvents: []

@@ -9,7 +9,7 @@ const ComponentForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
             id: initialValues?.id || crypto.randomUUID(),
             name: values.name,
             description: values.description,
-            type: values.type
+            componentTypeId: values.type
         };
         onSubmit(componentData);
         form.resetFields();

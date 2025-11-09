@@ -46,6 +46,7 @@ const UnitAssignmentForm = ({ onSubmit, project }) => {
     };
 
     // Получить доступные Units для выбранного компонента
+// Получить доступные Units для выбранного компонента
     useEffect(() => {
         if (!selectedAssembly || !selectedComponent) {
             setAvailableUnits([]);
@@ -61,17 +62,18 @@ const UnitAssignmentForm = ({ onSubmit, project }) => {
         const component = assemblyType.components.find(c => c.id === selectedComponent);
         if (!component) return;
 
-        const componentType = getComponentType(component.componentTypeId);
-        if (!componentType) return;
+        // Получаем componentTypeId выбранного компонента
+        const componentTypeId = component.componentTypeId;
+        if (!componentTypeId) return;
 
-        // Найти все PartModels которые подходят для этого типа компонента
-        // В реальности нужна связь ComponentType -> PartModels
-        // Пока берем все units из всех partModels (упрощенная версия)
-        const allUnits = [];
+        // Найти все Units которые подходят для этого типа компонента
+        // Фильтруем PartModels по componentTypeId
+        const compatibleUnits = [];
         project.partModels.forEach(pm => {
-            if (pm.units && pm.units.length > 0) {
+            // Проверяем, что PartModel привязан к нужному ComponentType
+            if (pm.componentTypeId === componentTypeId && pm.units && pm.units.length > 0) {
                 pm.units.forEach(unit => {
-                    allUnits.push({
+                    compatibleUnits.push({
                         ...unit,
                         partModelName: pm.name,
                         partModelId: pm.id
@@ -80,7 +82,7 @@ const UnitAssignmentForm = ({ onSubmit, project }) => {
             }
         });
 
-        setAvailableUnits(allUnits);
+        setAvailableUnits(compatibleUnits);
     }, [selectedAssembly, selectedComponent, project]);
 
     const handleAssemblyChange = (assemblyId) => {

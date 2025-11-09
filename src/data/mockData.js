@@ -72,6 +72,7 @@ export const mockProjects = {
                 name: 'Двигатель ГТД-10',
                 uid: 'ENGINE-GTD-10',
                 specification: 'ГТД-10 Технические условия ТУ-123',
+                componentTypeId: '550e8400-e29b-41d4-a716-446655440100',
                 maintenanceTypes: [
                     {
                         id: '550e8400-e29b-41d4-a716-446655440300',
@@ -94,24 +95,28 @@ export const mockProjects = {
                     {
                         id: '550e8400-e29b-41d4-a716-446655440400',
                         name: 'ДВ-001',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440200',
                         serialNumber: 'ENG-2023-001',
                         manufactureDate: '2023-01-15'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440401',
                         name: 'ДВ-002',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440200',
                         serialNumber: 'ENG-2023-002',
                         manufactureDate: '2023-01-20'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440402',
                         name: 'ДВ-003',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440200',
                         serialNumber: 'ENG-2023-003',
                         manufactureDate: '2023-02-10'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440403',
                         name: 'ДВ-004',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440200',
                         serialNumber: 'ENG-2023-004',
                         manufactureDate: '2023-02-15'
                     }
@@ -122,6 +127,7 @@ export const mockProjects = {
                 name: 'Компрессор ЦК-5',
                 uid: 'COMPRESSOR-CK-5',
                 specification: 'ЦК-5 Технические условия ТУ-456',
+                componentTypeId: '550e8400-e29b-41d4-a716-446655440101',
                 maintenanceTypes: [
                     {
                         id: '550e8400-e29b-41d4-a716-446655440302',
@@ -144,24 +150,28 @@ export const mockProjects = {
                     {
                         id: '550e8400-e29b-41d4-a716-446655440404',
                         name: 'КОМП-001',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440201',
                         serialNumber: 'COMP-2023-001',
                         manufactureDate: '2023-02-01'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440405',
                         name: 'КОМП-002',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440201',
                         serialNumber: 'COMP-2023-002',
                         manufactureDate: '2023-02-05'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440406',
                         name: 'КОМП-003',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440201',
                         serialNumber: 'COMP-2023-003',
                         manufactureDate: '2023-02-20'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440407',
                         name: 'КОМП-004',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440201',
                         serialNumber: 'COMP-2023-004',
                         manufactureDate: '2023-02-25'
                     }
@@ -172,6 +182,7 @@ export const mockProjects = {
                 name: 'Фильтр ФВ-100',
                 uid: 'FILTER-FV-100',
                 specification: 'ФВ-100 Технические условия ТУ-789',
+                componentTypeId: '550e8400-e29b-41d4-a716-446655440102',
                 maintenanceTypes: [
                     {
                         id: '550e8400-e29b-41d4-a716-446655440304',
@@ -186,24 +197,28 @@ export const mockProjects = {
                     {
                         id: '550e8400-e29b-41d4-a716-446655440408',
                         name: 'ФИЛЬТР-001',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440202',
                         serialNumber: 'FILT-2023-001',
                         manufactureDate: '2023-03-01'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440409',
                         name: 'ФИЛЬТР-002',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440202',
                         serialNumber: 'FILT-2023-002',
                         manufactureDate: '2023-03-05'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440410',
                         name: 'ФИЛЬТР-003',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440202',
                         serialNumber: 'FILT-2023-003',
                         manufactureDate: '2023-03-10'
                     },
                     {
                         id: '550e8400-e29b-41d4-a716-446655440411',
                         name: 'ФИЛЬТР-004',
+                        partModelId: '550e8400-e29b-41d4-a716-446655440202',
                         serialNumber: 'FILT-2023-004',
                         manufactureDate: '2023-03-15'
                     }
@@ -299,6 +314,8 @@ export const mockProjects = {
             }
         ],
         timeline: {
+            start: '2025-01-01',
+            end: '2025-12-31',
             assemblyStates: [
                 {
                     assemblyId: '550e8400-e29b-41d4-a716-446655440600',
@@ -616,6 +633,8 @@ export const mockProjects = {
         partModels: [],
         nodes: [],
         timeline: {
+            start: '2025-01-01',
+            end: '2025-12-31',
             assemblyStates: [],
             unitAssignments: [],
             maintenanceEvents: []

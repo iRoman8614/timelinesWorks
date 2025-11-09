@@ -9,7 +9,8 @@ const AssemblyForm = ({ onSubmit, initialValues, assemblyTypes = [] }) => {
             id: initialValues?.id || crypto.randomUUID(),
             name: values.name,
             description: values.description,
-            type: values.type
+            type: 'ASSEMBLY',
+            assemblyTypeId: values.type
         };
         onSubmit(assemblyData);
         form.resetFields();

@@ -165,7 +165,8 @@ const ProjectWorkspacePage = () => {
     const handleAddPartModel = (data) => {
         const partModelWithUnits = {
             ...data,
-            units: [] // Инициализация пустого массива units
+            maintenanceTypes: data.maintenanceTypes || [],
+            units: data.units || []
         };
         const updated = {
             ...project,
@@ -729,7 +730,10 @@ const ProjectWorkspacePage = () => {
                 footer={null}
                 width={600}
             >
-                <PartModelForm onSubmit={handleAddPartModel} />
+                <PartModelForm
+                    onSubmit={handleAddPartModel}
+                    componentTypes={project.componentTypes}
+                />
             </Modal>
 
             <Modal
@@ -957,6 +961,7 @@ const ProjectWorkspacePage = () => {
             >
                 <PartModelForm
                     initialValues={editingItem}
+                    componentTypes={project.componentTypes}
                     onSubmit={(data) => {
                         const updated = {
                             ...project,

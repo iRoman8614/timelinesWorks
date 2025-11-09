@@ -1,7 +1,7 @@
 import React from 'react';
-import { Form, Input, Button, Space } from 'antd';
+import { Form, Input, Button, Space, Select } from 'antd';
 
-const PartModelForm = ({ onSubmit, initialValues }) => {
+const PartModelForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
     const [form] = Form.useForm();
 
     const handleFinish = (values) => {
@@ -11,8 +11,9 @@ const PartModelForm = ({ onSubmit, initialValues }) => {
             description: values.description,
             uid: values.uid,
             specification: values.specification,
-            maintenanceTypes: [],
-            units: []
+            componentTypeId: values.componentTypeId || initialValues?.componentTypeId || null,
+            maintenanceTypes: initialValues?.maintenanceTypes || [],
+            units: initialValues?.units || []
         };
         onSubmit(partModelData);
         form.resetFields();
@@ -47,6 +48,20 @@ const PartModelForm = ({ onSubmit, initialValues }) => {
                 rules={[{ required: true, message: 'Введите спецификацию' }]}
             >
                 <Input placeholder="Спецификация детали" />
+            </Form.Item>
+
+            <Form.Item
+                name="componentTypeId"
+                label="Тип компонента"
+                rules={[{ required: true, message: 'Выберите тип компонента' }]}
+            >
+                <Select placeholder="Выберите тип компонента">
+                    {componentTypes.map(type => (
+                        <Select.Option key={type.id} value={type.id}>
+                            {type.name}
+                        </Select.Option>
+                    ))}
+                </Select>
             </Form.Item>
 
             <Form.Item
