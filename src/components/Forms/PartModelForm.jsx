@@ -39,7 +39,7 @@ const PartModelForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
                 label="UID"
                 rules={[{ required: true, message: 'Введите UID' }]}
             >
-                <Input placeholder="Уникальный идентификатор" />
+                <Input placeholder="Уникальный идентификатор, например двиг-в8" />
             </Form.Item>
 
             <Form.Item
@@ -47,7 +47,7 @@ const PartModelForm = ({ onSubmit, initialValues, componentTypes = [] }) => {
                 label="Спецификация"
                 rules={[{ required: true, message: 'Введите спецификацию' }]}
             >
-                <Input placeholder="Спецификация детали" />
+                <Input placeholder="Спецификация детали, например двиг-в8-1-2-3" />
             </Form.Item>
 
             <Form.Item

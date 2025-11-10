@@ -109,16 +109,16 @@ const ProjectNavigatorPage = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <Title level={4} style={{ margin: 0 }}>Выберите проект</Title>
                         <Space>
-                            <Button
-                                type="primary"
-                                icon={<FolderAddOutlined />}
-                                onClick={() => {
-                                    setSelectedParentKey(null);
-                                    setIsFolderModalVisible(true);
-                                }}
-                            >
-                                Создать папку
-                            </Button>
+                            {/*<Button*/}
+                            {/*    type="primary"*/}
+                            {/*    icon={<FolderAddOutlined />}*/}
+                            {/*    onClick={() => {*/}
+                            {/*        setSelectedParentKey(null);*/}
+                            {/*        setIsFolderModalVisible(true);*/}
+                            {/*    }}*/}
+                            {/*>*/}
+                            {/*    Создать папку*/}
+                            {/*</Button>*/}
                             <Button
                                 type="primary"
                                 icon={<PlusOutlined />}
@@ -141,18 +141,18 @@ const ProjectNavigatorPage = () => {
                 </div>
             </Content>
 
-            <Modal
-                title="Создать папку"
-                open={isFolderModalVisible}
-                onCancel={() => {
-                    setIsFolderModalVisible(false);
-                    setSelectedParentKey(null);
-                }}
-                footer={null}
-                width={600}
-            >
-                <FolderForm onSubmit={handleCreateFolder} />
-            </Modal>
+            {/*<Modal*/}
+            {/*    title="Создать папку"*/}
+            {/*    open={isFolderModalVisible}*/}
+            {/*    onCancel={() => {*/}
+            {/*        setIsFolderModalVisible(false);*/}
+            {/*        setSelectedParentKey(null);*/}
+            {/*    }}*/}
+            {/*    footer={null}*/}
+            {/*    width={600}*/}
+            {/*>*/}
+            {/*    <FolderForm onSubmit={handleCreateFolder} />*/}
+            {/*</Modal>*/}
 
             <Modal
                 title="Создать проект"

@@ -40,7 +40,7 @@ const ComponentTypeForm = ({ onSubmit, initialValues }) => {
             <Form.Item
                 name="description"
                 label="Описание"
-                rules={[{ required: true, message: 'Введите описание' }]}
+                rules={[{ message: 'Введите описание' }]}
             >
                 <Input.TextArea rows={3} placeholder="Газотурбинный двигатель" />
             </Form.Item>

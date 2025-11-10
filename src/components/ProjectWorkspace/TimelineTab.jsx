@@ -15,6 +15,8 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
     const [zoom, setZoom] = useState(30);
     const [assignmentForm] = Form.useForm();
     const [openTracks, setOpenTracks] = useState({});
+    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+    const [generationStatus, setGenerationStatus] = useState(null);
 
     const timeline = project?.timeline || {};
 
@@ -696,13 +698,18 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         message.success('Таймлайн очищен');
     }, [project, onProjectUpdate]);
 
-    const handleGeneratePlan = useCallback(() => {
+    const handleGeneratePlan = useCallback(async () => {
         if (!project || !onProjectUpdate) {
             return;
         }
 
+        setIsGeneratingPlan(true);
+        setGenerationStatus('Подготовка...');
+
         try {
-            const newTimeline = generateMaintenancePlan(project);
+            const newTimeline = await generateMaintenancePlan(project, (status) => {
+                setGenerationStatus(status);
+            });
 
             onProjectUpdate({
                 ...project,
@@ -713,6 +720,9 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         } catch (error) {
             console.error('Ошибка генерации плана:', error);
             message.error('Ошибка при генерации плана ТО');
+        } finally {
+            setIsGeneratingPlan(false);
+            setTimeout(() => setGenerationStatus(null), 1500);
         }
     }, [project, onProjectUpdate]);
 
@@ -900,15 +910,22 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     <Button
                         type="primary"
                         onClick={handleGeneratePlan}
+                        loading={isGeneratingPlan}
+                        disabled={isGeneratingPlan}
                     >
                         Сгенерировать план ТО
                     </Button>
-                    <Button
-                        danger
-                        onClick={handleClearTimeline}
-                    >
-                        Очистить таймлайн
-                    </Button>
+                    {generationStatus && (
+                        <Typography.Text type="secondary">
+                            {generationStatus}
+                        </Typography.Text>
+                    )}
+                    {/*<Button*/}
+                    {/*    danger*/}
+                    {/*    onClick={handleClearTimeline}*/}
+                    {/*>*/}
+                    {/*    Очистить таймлайн*/}
+                    {/*</Button>*/}
                 </Space>
             </Card>
             <Card className="timeline-chart">

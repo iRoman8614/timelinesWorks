@@ -687,13 +687,13 @@ const ProjectWorkspacePage = () => {
                         >
                             Сохранить
                         </Button>
-                        <Button
-                            type="primary"
-                            icon={<SendOutlined />}
-                            onClick={sendToServer}
-                        >
-                            Отправить на сервер
-                        </Button>
+                        {/*<Button*/}
+                        {/*    type="primary"*/}
+                        {/*    icon={<SendOutlined />}*/}
+                        {/*    onClick={sendToServer}*/}
+                        {/*>*/}
+                        {/*    Отправить на сервер*/}
+                        {/*</Button>*/}
                     </Space>
                 </div>
             </Header>

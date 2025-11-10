@@ -428,7 +428,7 @@ export const generateMaintenancePlan = async (project, onProgress = null) => {
 
     // Шаг 1: Анализ заданных работ
     if (onProgress) onProgress('Анализ заданных работ...', 10);
-    await delay(500, 1500);
+    await delay(1000, 3000);
 
     const customMaintenanceEvents = (timeline.maintenanceEvents || []).filter(
         event => event.custom === true
@@ -436,15 +436,15 @@ export const generateMaintenancePlan = async (project, onProgress = null) => {
 
     // Шаг 2: Анализ структуры агрегатов
     if (onProgress) onProgress('Анализ структуры агрегатов...', 20);
-    await delay(500, 1500);
+    await delay(1000, 3000);
 
     const assemblies = getAllAssemblies(project.nodes || []);
 
     // Шаг 3: Планирование простоев
     if (onProgress) onProgress('Планирование простоев...', 40);
-    await delay(500, 1500);
+    await delay(1000, 3000);
 
-    const { assemblyStates, idlePeriodsMap } = await generateAssemblyStatesWithPeriods(
+    const { assemblyStates: initialAssemblyStates, idlePeriodsMap } = await generateAssemblyStatesWithPeriods(
         assemblies,
         customMaintenanceEvents,
         project,
@@ -453,7 +453,7 @@ export const generateMaintenancePlan = async (project, onProgress = null) => {
 
     // Шаг 4: Генерация плановых работ для заполнения простоев
     if (onProgress) onProgress('Генерация плановых работ...', 70);
-    await delay(500, 1500);
+    await delay(1000, 3000);
 
     const generatedEvents = await generateMaintenanceEventsForIdlePeriods(
         assemblies,
@@ -466,7 +466,7 @@ export const generateMaintenancePlan = async (project, onProgress = null) => {
 
     // Шаг 5: Финализация
     if (onProgress) onProgress('Финализация плана...', 90);
-    await delay(500, 1500);
+    await delay(1000, 3000);
 
     const allMaintenanceEvents = [
         ...customMaintenanceEvents,
@@ -476,10 +476,24 @@ export const generateMaintenancePlan = async (project, onProgress = null) => {
     if (onProgress) onProgress('План готов!', 100);
     await delay(300, 500);
 
+    const finalIdlePeriodsMap = recalculateIdlePeriodsWithAllEvents(
+        assemblies,
+        allMaintenanceEvents,
+        project,
+        timeline
+    );
+
+    const finalAssemblyStates = buildAssemblyStatesFromIdlePeriods(
+        assemblies,
+        finalIdlePeriodsMap,
+        project,
+        timeline
+    );
+
     return {
         start: timeline.start || '2025-01-01',
         end: timeline.end || '2025-12-31',
-        assemblyStates: assemblyStates,
+        assemblyStates: finalAssemblyStates,
         unitAssignments: timeline.unitAssignments || [],
         maintenanceEvents: allMaintenanceEvents
     };
@@ -607,23 +621,125 @@ const generateAssemblyStatesWithPeriods = async (assemblies, maintenanceEvents, 
     return { assemblyStates: sortedStates, idlePeriodsMap };
 };
 
+const recalculateIdlePeriodsWithAllEvents = (assemblies, allEvents, project, timeline) => {
+    const recalculatedMap = new Map();
+    const timelineStart = dayjs(timeline.start || '2025-01-01');
+    const timelineEnd = dayjs(timeline.end || '2025-12-31');
+
+    assemblies.forEach(assembly => {
+        const assemblyType = project.assemblyTypes?.find(at => at.id === assembly.assemblyTypeId);
+        if (!assemblyType) {
+            recalculatedMap.set(assembly.id, []);
+            return;
+        }
+
+        const eventsForAssembly = getMaintenanceEventsForAssembly(
+            assembly,
+            allEvents,
+            assemblyType,
+            timeline,
+            project
+        );
+
+        if (eventsForAssembly.length === 0) {
+            recalculatedMap.set(assembly.id, []);
+            return;
+        }
+
+        const idlePeriods = groupEventsIntoIdlePeriods(
+            eventsForAssembly,
+            project,
+            timelineStart,
+            timelineEnd
+        );
+
+        recalculatedMap.set(assembly.id, idlePeriods);
+    });
+
+    return recalculatedMap;
+};
+
+const buildAssemblyStatesFromIdlePeriods = (assemblies, idlePeriodsMap, project, timeline) => {
+    const states = [];
+    const timelineStart = dayjs(timeline.start || '2025-01-01');
+    const timelineEnd = dayjs(timeline.end || '2025-12-31');
+
+    assemblies.forEach(assembly => {
+        const idlePeriods = idlePeriodsMap.get(assembly.id) || [];
+
+        states.push({
+            assemblyId: assembly.id,
+            type: 'WORKING',
+            dateTime: timelineStart.format('YYYY-MM-DDTHH:mm:ss')
+        });
+
+        idlePeriods.forEach(period => {
+            const idleStart = dayjs(period.start);
+            const idleEnd = dayjs(period.end);
+
+            const shutdownDelay = Math.floor(Math.random() * 61) + 30;
+            const shutdownTime = idleStart.subtract(1, 'day').add(shutdownDelay, 'minute');
+
+            if (shutdownTime.isAfter(timelineStart)) {
+                states.push({
+                    assemblyId: assembly.id,
+                    type: 'SHUTTING_DOWN',
+                    dateTime: shutdownTime.format('YYYY-MM-DDTHH:mm:ss')
+                });
+            }
+
+            const idleDelay = Math.floor(Math.random() * 61) + 30;
+            states.push({
+                assemblyId: assembly.id,
+                type: 'IDLE',
+                dateTime: idleStart.add(idleDelay, 'minute').format('YYYY-MM-DDTHH:mm:ss')
+            });
+
+            const startupDelay = Math.floor(Math.random() * 61) + 30;
+            states.push({
+                assemblyId: assembly.id,
+                type: 'STARTING_UP',
+                dateTime: idleEnd.add(startupDelay, 'minute').format('YYYY-MM-DDTHH:mm:ss')
+            });
+
+            const workingDelay = Math.floor(Math.random() * 61) + 30;
+            const workingTime = idleEnd.add(1, 'day').add(workingDelay, 'minute');
+
+            if (workingTime.isBefore(timelineEnd)) {
+                states.push({
+                    assemblyId: assembly.id,
+                    type: 'WORKING',
+                    dateTime: workingTime.format('YYYY-MM-DDTHH:mm:ss')
+                });
+            }
+        });
+    });
+
+    return states.sort((a, b) => {
+        const timeDiff = dayjs(a.dateTime).valueOf() - dayjs(b.dateTime).valueOf();
+        if (timeDiff !== 0) return timeDiff;
+        return a.assemblyId.localeCompare(b.assemblyId);
+    });
+};
+
 /**
  * Генерирует случайные maintenance events для заполнения простоев
  */
 const generateMaintenanceEventsForIdlePeriods = async (assemblies, idlePeriodsMap, customEvents, project, timeline, onProgress) => {
     const generatedEvents = [];
+    const timelineRangeEnd = dayjs(timeline.end || '2025-12-31');
 
     for (const assembly of assemblies) {
         const idlePeriods = idlePeriodsMap.get(assembly.id) || [];
         const assemblyType = project.assemblyTypes?.find(at => at.id === assembly.assemblyTypeId);
         if (!assemblyType) continue;
 
-        await delay(500, 1500);
+        await delay(1000, 3000);
 
         for (const period of idlePeriods) {
             const periodStart = dayjs(period.start);
-            const periodEnd = dayjs(period.end);
-            const periodDuration = periodEnd.diff(periodStart, 'day');
+            let periodEnd = dayjs(period.end);
+            let periodDuration = periodEnd.diff(periodStart, 'day');
 
             // Получаем все компоненты агрегата
             const components = assemblyType.components;
@@ -662,13 +778,62 @@ const generateMaintenanceEventsForIdlePeriods = async (assemblies, idlePeriodsMa
 
                     if (alreadyExists) continue;
 
-                    // Генерируем случайную дату внутри периода
-                    const randomDayOffset = Math.floor(Math.random() * Math.max(1, periodDuration - randomMaintenanceType.duration));
-                    const workDate = periodStart.add(randomDayOffset, 'day');
+                    // Актуализируем длительность периода (мог измениться после расширения)
+                    periodEnd = dayjs(period.end);
+                    periodDuration = periodEnd.diff(periodStart, 'day');
+                    const requiredDuration = randomMaintenanceType.duration;
 
-                    // Проверяем, что работа помещается в период
-                    const workEnd = workDate.add(randomMaintenanceType.duration, 'day');
-                    if (workEnd.isAfter(periodEnd)) continue;
+                    // Если период слишком короткий, пытаемся расширить его
+                    if (periodDuration < requiredDuration) {
+                        const extensionBuffer = Math.floor(Math.random() * 3) + 1; // 1-3 дня
+                        const requiredExtension = requiredDuration - periodDuration + extensionBuffer;
+                        const potentialNewEnd = periodEnd.add(requiredExtension, 'day');
+
+                        if (potentialNewEnd.isBefore(timelineRangeEnd) || potentialNewEnd.isSame(timelineRangeEnd, 'day')) {
+                            periodEnd = potentialNewEnd;
+                            period.end = potentialNewEnd.format('YYYY-MM-DDTHH:mm:ss');
+                            periodDuration = periodEnd.diff(periodStart, 'day');
+                        } else {
+                            // Увеличить период нельзя, пропускаем работу
+                            continue;
+                        }
+                    }
+
+                    const maxStartOffset = Math.max(periodDuration - requiredDuration, 0);
+                    let workDate = periodStart.add(
+                        Math.floor(Math.random() * (maxStartOffset + 1)),
+                        'day'
+                    );
+
+                    let workEnd = workDate.add(requiredDuration, 'day');
+
+                    if (workEnd.isAfter(periodEnd)) {
+                        // Смещаем работу ближе к концу периода
+                        workDate = periodEnd.subtract(requiredDuration, 'day');
+                        workEnd = workDate.add(requiredDuration, 'day');
+
+                        // Если после смещения всё ещё не помещается — пробуем слегка расширить период
+                        if (workDate.isBefore(periodStart)) {
+                            const extensionBuffer = Math.floor(Math.random() * 3) + 1;
+                            const extraExtension = requiredDuration - periodDuration + extensionBuffer;
+                            const potentialNewEnd = periodEnd.add(extraExtension, 'day');
+
+                            if (potentialNewEnd.isBefore(timelineRangeEnd) || potentialNewEnd.isSame(timelineRangeEnd, 'day')) {
+                                periodEnd = potentialNewEnd;
+                                period.end = potentialNewEnd.format('YYYY-MM-DDTHH:mm:ss');
+                                periodDuration = periodEnd.diff(periodStart, 'day');
+                                workDate = periodEnd.subtract(requiredDuration, 'day');
+                                workEnd = workDate.add(requiredDuration, 'day');
+                            } else {
+                                // Расширить нельзя — пропускаем
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (workDate.isBefore(periodStart) || workEnd.isAfter(periodEnd)) {
+                        continue;
+                    }
 
                     generatedEvents.push({
                         maintenanceTypeId: randomMaintenanceType.id,
@@ -812,12 +977,23 @@ const groupEventsIntoIdlePeriods = (events, project, timelineStart, timelineEnd)
     return periodsWithExtra;
 };
 
+const calculateIdlePeriodCountRange = (rangeStart, rangeEnd) => {
+    const rangeDays = Math.max(0, rangeEnd.diff(rangeStart, 'day'));
+    const segments = Math.max(1, Math.floor(rangeDays / 90) || 1);
+
+    return {
+        minCount: segments,
+        maxCount: segments * 2
+    };
+};
+
 /**
  * Добавляет дополнительные простои там, где нет custom работ
  */
 const addExtraIdlePeriods = (existingPeriods, timelineStart, timelineEnd) => {
     if (existingPeriods.length === 0) {
-        return generateRandomIdlePeriods(timelineStart, timelineEnd, 1, 2);
+        const { minCount, maxCount } = calculateIdlePeriodCountRange(timelineStart, timelineEnd);
+        return generateRandomIdlePeriods(timelineStart, timelineEnd, minCount, maxCount);
     }
 
     const allPeriods = [...existingPeriods];
@@ -828,7 +1004,8 @@ const addExtraIdlePeriods = (existingPeriods, timelineStart, timelineEnd) => {
         const gapDays = nextStart.diff(currentEnd, 'day');
 
         if (gapDays > 30) {
-            const extraPeriods = generateRandomIdlePeriods(currentEnd, nextStart, 0, 1);
+            const { minCount, maxCount } = calculateIdlePeriodCountRange(currentEnd, nextStart);
+            const extraPeriods = generateRandomIdlePeriods(currentEnd, nextStart, minCount, maxCount);
             allPeriods.push(...extraPeriods);
         }
     }
@@ -836,14 +1013,16 @@ const addExtraIdlePeriods = (existingPeriods, timelineStart, timelineEnd) => {
     const firstPeriodStart = dayjs(existingPeriods[0].start);
     const daysFromStart = firstPeriodStart.diff(timelineStart, 'day');
     if (daysFromStart > 30) {
-        const extraPeriods = generateRandomIdlePeriods(timelineStart, firstPeriodStart, 0, 1);
+        const { minCount, maxCount } = calculateIdlePeriodCountRange(timelineStart, firstPeriodStart);
+        const extraPeriods = generateRandomIdlePeriods(timelineStart, firstPeriodStart, minCount, maxCount);
         allPeriods.push(...extraPeriods);
     }
 
     const lastPeriodEnd = dayjs(existingPeriods[existingPeriods.length - 1].end);
     const daysToEnd = timelineEnd.diff(lastPeriodEnd, 'day');
     if (daysToEnd > 30) {
-        const extraPeriods = generateRandomIdlePeriods(lastPeriodEnd, timelineEnd, 0, 1);
+        const { minCount, maxCount } = calculateIdlePeriodCountRange(lastPeriodEnd, timelineEnd);
+        const extraPeriods = generateRandomIdlePeriods(lastPeriodEnd, timelineEnd, minCount, maxCount);
         allPeriods.push(...extraPeriods);
     }
 
@@ -857,19 +1036,34 @@ const addExtraIdlePeriods = (existingPeriods, timelineStart, timelineEnd) => {
  */
 const generateRandomIdlePeriods = (rangeStart, rangeEnd, minCount, maxCount) => {
     const periods = [];
-    const count = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
+    const rangeDays = Math.max(0, rangeEnd.diff(rangeStart, 'day'));
 
-    const rangeDays = rangeEnd.diff(rangeStart, 'day');
-    if (rangeDays < 10) return periods;
+    if (rangeDays < 10 || maxCount < 1) {
+        return periods;
+    }
+
+    const safeMin = Math.max(0, minCount);
+    const safeMax = Math.max(safeMin, maxCount);
+    const count = Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+
+    if (count === 0) {
+        return periods;
+    }
+
+    const maxOffset = Math.max(rangeDays - 20, 1);
 
     for (let i = 0; i < count; i++) {
-        const randomDayOffset = Math.floor(Math.random() * (rangeDays - 20));
+        const duration = Math.floor(Math.random() * 11) + 5;
+        const maxStartOffset = Math.max(rangeDays - duration - 1, 0);
+        const randomDayOffset = Math.min(
+            Math.floor(Math.random() * maxOffset),
+            maxStartOffset
+        );
         const periodStart = rangeStart.add(randomDayOffset, 'day');
 
-        const duration = Math.floor(Math.random() * 11) + 5;
         const periodEnd = periodStart.add(duration, 'day');
 
-        if (periodEnd.isBefore(rangeEnd)) {
+        if (periodEnd.isBefore(rangeEnd) || periodEnd.isSame(rangeEnd, 'day')) {
             periods.push({
                 start: periodStart.format('YYYY-MM-DDTHH:mm:ss'),
                 end: periodEnd.format('YYYY-MM-DDTHH:mm:ss'),

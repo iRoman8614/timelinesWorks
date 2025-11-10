@@ -58,7 +58,7 @@ const MaintenanceTypeForm = ({ onSubmit, initialValues }) => {
             <Form.Item
                 name="priority"
                 label="Приоритет"
-                rules={[{ required: true, message: 'Введите приоритет' }]}
+                rules={[{ message: 'Введите приоритет' }]}
             >
                 <InputNumber min={1} placeholder="Приоритет" style={{ width: '100%' }} />
             </Form.Item>

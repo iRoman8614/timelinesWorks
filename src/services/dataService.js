@@ -1,4 +1,4 @@
-import { mockProjects } from '../data/mockData';
+import { mockProjects, mockStructureTree } from '../data/mockData';
 
 const getDefaultTimelineRange = () => {
     const now = new Date();
@@ -18,18 +18,15 @@ class DataService {
 
     initializeStorage() {
         const existingTree = localStorage.getItem(this.STRUCTURE_TREE_KEY);
-        // if (!existingTree) {
-        //     localStorage.setItem(this.STRUCTURE_TREE_KEY, JSON.stringify(mockStructureTree));
-        // }
+        if (!existingTree && mockStructureTree) {
+            localStorage.setItem(this.STRUCTURE_TREE_KEY, JSON.stringify(mockStructureTree));
+        }
 
-        Object.keys(mockProjects).forEach(projectKey => {
-            const projectId = mockProjects[projectKey].id;
-            const existingProject = localStorage.getItem(this.STORAGE_KEY_PREFIX + projectId);
+        mockProjects.forEach(project => {
+            const storageKey = this.STORAGE_KEY_PREFIX + project.id;
+            const existingProject = localStorage.getItem(storageKey);
             if (!existingProject) {
-                localStorage.setItem(
-                    this.STORAGE_KEY_PREFIX + projectId,
-                    JSON.stringify(mockProjects[projectKey])
-                );
+                localStorage.setItem(storageKey, JSON.stringify(project));
             }
         });
     }
