@@ -1,5 +1,5 @@
 import React, {useState, useMemo, useCallback, useEffect} from 'react';
-import { Card, DatePicker, Space, Typography, Form, Select, Button, message, InputNumber, Checkbox, Progress, Alert } from 'antd';
+import { Card, DatePicker, Space, Typography, Form, Select, Button, message, InputNumber, Checkbox, Progress, Alert, Descriptions } from 'antd';
 import { LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
@@ -20,6 +20,7 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     const [openTracks, setOpenTracks] = useState({});
     const [includeOperatingInterval, setIncludeOperatingInterval] = useState(false);
     const [forceRenderKey, setForceRenderKey] = useState(0);
+    const [selectedElement, setSelectedElement] = useState(null);
 
     // Flux генерация
     const {
@@ -32,18 +33,6 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     } = useFluxTimelineGeneration();
 
     const timeline = project?.timeline || {};
-
-    console.log(
-        '🔄 TimelineTab render',
-        {
-            forceRenderKey,
-            assemblyStates: timeline.assemblyStates?.length || 0,
-            unitAssignments: timeline.unitAssignments?.length || 0,
-            maintenanceEvents: timeline.maintenanceEvents?.length || 0,
-            timelineStart: timeline.start,
-            timelineEnd: timeline.end,
-        }
-    );
 
     const projectStart = timeline?.start || project?.start;
     const projectEnd = timeline?.end || project?.end;
@@ -67,12 +56,10 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
         timelineEndDayjs = timelineStartDayjs;
     }
 
-    const timelineStartKey = timelineStartDayjs.format(DATE_FORMAT);
     const timelineEndKey = timelineEndDayjs.format(DATE_FORMAT);
     const timelineStartDate = timelineStartDayjs.startOf('day').toDate();
     const timelineEndDate = timelineEndDayjs.endOf('day').toDate();
 
-    // Обработка ошибок Flux
     React.useEffect(() => {
         if (fluxError) {
             message.error(fluxError);
@@ -106,33 +93,97 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
 
     const clickElement = useCallback((element) => {
         console.log('Clicked element:', element);
+
+        if (
+            element?.meta &&
+            (element.meta.kind === 'unitAssignment' ||
+                element.meta.kind === 'maintenanceEvent')
+        ) {
+            setSelectedElement(element);
+        }
+    }, [setSelectedElement]);
+
+    //
+    // const toggleTrackOpen = useCallback((trackId) => {
+    //     setOpenTracks(prev => ({
+    //         ...prev,
+    //         [trackId]: !prev[trackId]
+    //     }));
+    // }, []);
+
+    const toggleTrackOpen = useCallback((track) => {
+        setOpenTracks(prev => {
+            const wasOpen = prev[track.id] !== false; // по умолчанию открыт
+            return {
+                ...prev,
+                [track.id]: !wasOpen,
+            };
+        });
     }, []);
 
-    const clickTrackButton = useCallback((track) => {
-        console.log('Clicked track button:', track);
-    }, []);
 
-    const toggleTrackOpen = useCallback((trackId) => {
-        setOpenTracks(prev => ({
-            ...prev,
-            [trackId]: !prev[trackId]
-        }));
-    }, []);
+    const clickTrackButton = useCallback(
+        (track) => {
+            console.log('Clicked track button:', track);
+            toggleTrackOpen(track);
+        },
+        [toggleTrackOpen]
+    );
 
-    const customElementRenderer = useCallback(({ element, ...props }) => {
-        return (
-            <div
-                {...props}
-                data-title={element.dataTitle || element.title}
-                style={{
-                    ...props.style,
-                    ...element.style
-                }}
-            >
-                {element.title}
-            </div>
-        );
-    }, []);
+
+    // const customElementRenderer = useCallback(({ element, ...props }) => {
+    //     return (
+    //         <div
+    //             {...props}
+    //             data-title={element.dataTitle || element.title}
+    //             style={{
+    //                 ...props.style,
+    //                 ...element.style
+    //             }}
+    //         >
+    //             {element.title}
+    //         </div>
+    //     );
+    // }, []);
+
+    const customElementRenderer = useCallback(
+        ({ element, ...props }) => {
+            const handleDoubleClick = (e) => {
+                e.stopPropagation();
+
+                if (
+                    element.meta &&
+                    (element.meta.kind === 'unitAssignment' ||
+                        element.meta.kind === 'maintenanceEvent')
+                ) {
+                    setSelectedElement(element);
+                }
+            };
+
+            const isInteractive =
+                element.meta &&
+                (element.meta.kind === 'unitAssignment' ||
+                    element.meta.kind === 'maintenanceEvent');
+
+            return (
+                <div
+                    {...props}
+                    onDoubleClick={handleDoubleClick}
+                    data-title={element.dataTitle || element.title}
+                    style={{
+                        ...props.style,
+                        ...element.style,
+                        cursor: isInteractive ? 'pointer' : props.style?.cursor,
+                    }}
+                >
+                    {element.title}
+                </div>
+            );
+        },
+        []
+    );
+
+
 
     const assemblyTypeMap = useMemo(() => {
         const map = new Map();
@@ -210,14 +261,24 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
         return allMaintenanceTypes.find(mt => mt.id === maintenanceTypeId);
     }, [project?.partModels]);
 
-    // Функция для получения Unit по ID
+    const normalizeUnitId = (unitId) => {
+        console.log('unitId', unitId)
+        if (typeof unitId !== 'string') return unitId;
+        return unitId.startsWith('component-')
+            ? unitId.replace('component-', '')
+            : unitId;
+    };
+
     const getUnitById = useCallback((unitId) => {
-        return project?.partModels?.flatMap(pm => pm.units || [])
-            .find(u => u.id === unitId);
+        const cleanId = normalizeUnitId(unitId);
+
+        return project?.partModels
+            ?.flatMap(pm => pm.units || [])
+            .find(u => u.id === cleanId);
     }, [project?.partModels]);
 
     // Функция для получения Assembly по ID
-    const getAssemblyById = useCallback((assemblyId) => {
+    const getAssegetmblyById = useCallback((assemblyId) => {
         const findAssembly = (nodes) => {
             for (const node of nodes) {
                 if (node.id === assemblyId) {
@@ -244,7 +305,6 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                 maintenanceEvents: timeline.maintenanceEvents?.length || 0
             }
         );
-
 
         if (!project || !project.nodes || project.nodes.length === 0) {
             return [];
@@ -395,7 +455,14 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                                 fontWeight: 'bold',
                                 fontSize: '16px',
                                 textAlign: 'center'
-                            }
+                            },
+                            meta: {
+                                kind: 'unitAssignment',
+                                assignment,
+                                unit,
+                                assembly,
+                                component,
+                            },
                         });
 
                         // Добавляем события ТО для этого Unit на этот же трек компонента
@@ -403,11 +470,20 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                             ? new Date(componentAssignments[index + 1].dateTime)
                             : fallbackTimelineEndDate;
 
-                        const maintenanceEvents = timeline.maintenanceEvents?.filter(
-                            me => me.unitId === assignment.unitId &&
-                                new Date(me.dateTime) >= assignmentDate &&
-                                new Date(me.dateTime) <= assignmentEnd
-                        ) || [];
+                        const maintenanceEvents = (timeline.maintenanceEvents || []).filter((me) => {
+                            if (me.unitId !== assignment.unitId) return false;
+
+                            const eventTime = new Date(me.dateTime).getTime();
+                            const assignTime = assignmentDate.getTime();
+
+                            if (Number.isNaN(eventTime)) {
+                                console.warn('⚠️ maintenanceEvent с некорректной датой:', me);
+                                return false;
+                            }
+
+                            return eventTime >= assignTime;
+                        });
+
 
                         maintenanceEvents.forEach((event, eventIndex) => {
                             const maintenanceType = getMaintenanceType(event.maintenanceTypeId);
@@ -430,7 +506,15 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                                         border: `2px solid ${getMaintenanceColor(maintenanceType)}`,
                                         borderRadius: '4px',
                                         opacity: event.custom ? 0.7 : 0.9
-                                    }
+                                    },
+                                    meta: {
+                                        kind: 'maintenanceEvent',
+                                        event,
+                                        unit,
+                                        assembly,
+                                        component,
+                                        maintenanceType,
+                                    },
                                 });
                             }
                         });
@@ -455,7 +539,7 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
         });
 
         return allTracks;
-    }, [project, timeline, openTracks, timelineEndKey, getMaintenanceType, getUnitById, getAssemblyById, assemblyTypeMap]);
+    }, [project, timeline, openTracks, timelineEndKey, getMaintenanceType, getUnitById, assemblyTypeMap]);
 
     const timebar = useMemo(() => {
         const startDate = timelineStartDate;
@@ -595,88 +679,41 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
         message.success('Назначение детали добавлено');
     }, [assignmentForm, assemblyOptionMap, assemblyTypeMap, onProjectUpdate, project, timeline, unitOptions, includeOperatingInterval]);
 
-    const handleMaintenanceEventSubmit = useCallback((values) => {
-        if (!project || !onProjectUpdate) {
-            return;
-        }
+
+    const handleMaintenanceEventSubmit = useCallback(async (values) => {
+        if (!project || !onProjectUpdate) return;
+
+        const cleanUnitId = normalizeUnitId(values.unitId);
 
         const event = {
             maintenanceTypeId: values.maintenanceTypeId,
-            unitId: values.unitId,
-            dateTime: values.dateTime,
-            custom: true
+            unitId: cleanUnitId,
+            dateTime: dayjs(values.dateTime).format(ASSIGNMENT_DATETIME_FORMAT),
+            custom: true,
         };
 
-        const existingEvents = timeline.maintenanceEvents || [];
-        const updatedEvents = [...existingEvents, event]
-            .sort((a, b) => dayjs(a.dateTime).valueOf() - dayjs(b.dateTime).valueOf());
+        const updatedTimeline = {
+            ...project.timeline,
+            maintenanceEvents: [
+                ...(project.timeline?.maintenanceEvents || []),
+                event
+            ].sort((a, b) => dayjs(a.dateTime) - dayjs(b.dateTime)),
+        };
 
-        onProjectUpdate({
+        const tempProject = {
             ...project,
-            timeline: {
-                ...timeline,
-                assemblyStates: timeline.assemblyStates || [],
-                unitAssignments: timeline.unitAssignments || [],
-                maintenanceEvents: updatedEvents
-            }
-        });
+            timeline: updatedTimeline
+        };
+
+        await dataService.saveProject(project.id, tempProject);
+
+        const freshProject = await dataService.getProject(project.id);
+
+        onProjectUpdate(freshProject);
 
         message.success('Внеплановая работа добавлена');
-    }, [onProjectUpdate, project, timeline]);
+    }, [project, onProjectUpdate]);
 
-    /**
-     * Обработчик генерации плана через Flux
-     */
-    // const handleGeneratePlan = useCallback(async () => {
-    //     if (!project) {
-    //         message.error('Проект не загружен');
-    //         return;
-    //     }
-    //
-    //     try {
-    //         await generatePlan(project, (generatedTimeline) => {
-    //             message.success('План ТО успешно сгенерирован');
-    //         });
-    //     } catch (error) {
-    //         console.error('Error generating plan:', error);
-    //         message.error('Ошибка при генерации плана ТО');
-    //     }
-    // }, [project, generatePlan]);
-
-    /**
-     * Обработчик генерации плана через Flux
-     */
-// TimelineTab.jsx
-
-    // const handleGeneratePlan = useCallback(async () => {
-    //     console.log('🎯 handleGeneratePlan вызван');
-    //     console.log('📦 project:', project);
-    //
-    //     if (!project) {
-    //         console.error('❌ Проект не загружен');
-    //         message.error('Проект не загружен');
-    //         return;
-    //     }
-    //
-    //     if (!project.start || !project.end) {
-    //         console.error('❌ У проекта отсутствуют даты');
-    //         message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
-    //         return;
-    //     }
-    //
-    //     console.log('⏱️ [BEFORE FLUX] project.timeline:', project.timeline);
-    //     try {
-    //         await generatePlan(project, (generatedTimeline) => {
-    //             console.log('🎉 План ТО успешно сгенерирован (callback from hook)');
-    //             // 🟢 НОВЫЙ ТАЙМЛАЙН ИЗ FLUX
-    //             console.log('⏱️ [FROM FLUX] generatedTimeline:', generatedTimeline);
-    //             message.success('План ТО успешно сгенерирован');
-    //         });
-    //     } catch (error) {
-    //         console.error('❌ Error generating plan:', error);
-    //         message.error('Ошибка при генерации плана ТО');
-    //     }
-    // }, [project, generatePlan]);
 
     const handleGeneratePlan = useCallback(async () => {
             console.log('🎯 handleGeneratePlan вызван');
@@ -741,6 +778,136 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     const scaleEnd = timelineEndDate <= timelineStartDate
         ? dayjs(timelineStartDate).add(1, 'day').toDate()
         : timelineEndDate;
+
+    const renderSelectedElementInfo = () => {
+        if (!selectedElement || !selectedElement.meta) return null;
+        const { meta } = selectedElement;
+
+        if (meta.kind === 'unitAssignment' && meta.assignment) {
+            const { assignment, unit, assembly, component } = meta;
+
+            return (
+                <Descriptions column={1} size="small" bordered>
+                    <Descriptions.Item label="Тип">
+                        Назначение детали
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Деталь">
+                        {unit
+                            ? `${unit.name} (${unit.serialNumber || 'б/н'})`
+                            : assignment.unitId}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Агрегат">
+                        {assembly?.name ||
+                            assignment.componentOfAssembly?.assemblyId}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Компонент">
+                        {component?.name ||
+                            (assignment.componentOfAssembly?.componentPath || []).join(
+                                ' / '
+                            )}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Дата и время">
+                        {dayjs(assignment.dateTime).format('YYYY-MM-DD HH:mm')}
+                    </Descriptions.Item>
+                    {assignment.operatingInterval != null && (
+                        <Descriptions.Item label="Наработка, ч">
+                            {assignment.operatingInterval}
+                        </Descriptions.Item>
+                    )}
+                </Descriptions>
+            );
+        }
+
+        if (meta.kind === 'maintenanceEvent' && meta.event) {
+            const { event, unit, assembly, component, maintenanceType } = meta;
+
+            return (
+                <Descriptions column={1} size="small" bordered>
+                    <Descriptions.Item label="Тип">
+                        Работа по ТО
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Вид работ">
+                        {maintenanceType?.name || event.maintenanceTypeId}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Деталь">
+                        {unit
+                            ? `${unit.name} (${unit.serialNumber || 'б/н'})`
+                            : event.unitId}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Агрегат">
+                        {assembly?.name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Компонент">
+                        {component?.name}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Начало работ">
+                        {dayjs(event.dateTime).format('YYYY-MM-DD HH:mm')}
+                    </Descriptions.Item>
+                    {maintenanceType?.duration != null && (
+                        <Descriptions.Item label="Длительность, дней">
+                            {maintenanceType.duration}
+                        </Descriptions.Item>
+                    )}
+                    {event.custom && (
+                        <Descriptions.Item label="Тип события">
+                            Внеплановое
+                        </Descriptions.Item>
+                    )}
+                </Descriptions>
+            );
+        }
+
+        return null;
+    };
+
+
+    const handleDeleteSelectedElement = useCallback(
+        async () => {
+            if (!selectedElement || !project || !onProjectUpdate) return;
+            const meta = selectedElement.meta;
+            if (!meta) return;
+
+            try {
+                let updatedTimeline = { ...(project.timeline || {}) };
+
+                if (meta.kind === 'unitAssignment' && meta.assignment) {
+                    const prev = updatedTimeline.unitAssignments || [];
+                    updatedTimeline = {
+                        ...updatedTimeline,
+                        unitAssignments: prev.filter((a) => a !== meta.assignment),
+                    };
+                }
+
+                if (meta.kind === 'maintenanceEvent' && meta.event) {
+                    const prev = updatedTimeline.maintenanceEvents || [];
+                    updatedTimeline = {
+                        ...updatedTimeline,
+                        maintenanceEvents: prev.filter((e) => e !== meta.event),
+                    };
+                }
+
+                const updatedProject = {
+                    ...project,
+                    timeline: updatedTimeline,
+                };
+
+                await dataService.saveProject(project.id, updatedProject);
+                const freshProject = await dataService.getProject(project.id);
+
+                onProjectUpdate(freshProject);
+                message.success('Элемент удалён');
+            } catch (err) {
+                console.error('Ошибка при удалении элемента таймлайна', err);
+                message.error('Не удалось удалить элемент');
+            } finally {
+                setSelectedElement(null);
+                setForceRenderKey((k) => k + 1);
+            }
+        },
+        [selectedElement, project, onProjectUpdate]
+    );
+
+
 
     return (
         <div className="timeline-tab">
@@ -950,7 +1117,7 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                     <Typography.Text type="secondary">
                         Для выбранных типов компонентов создайте подходящие детали в разделе моделей, чтобы их можно было назначить.
                     </Typography.Text>
-                )}
+                )}unitId
             </Card>
 
             {/* Форма добавления внеплановой работы */}
@@ -1059,11 +1226,14 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                                 end: scaleEnd,
                                 zoom: zoom,
                             }}
+
                             zoomIn={zoomIn}
                             zoomOut={zoomOut}
                             clickElement={clickElement}
                             timebar={timebar}
                             tracks={tracks}
+                            clickTrackButton={clickTrackButton}
+                            toggleTrackOpen={toggleTrackOpen}
                             now={now}
                             enableSticky
                             scrollToNow
@@ -1078,6 +1248,39 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                     </div>
                 )}
             </Card>
+
+            {selectedElement && (
+                <div className="timeline-overlay">
+                    <div
+                        className="timeline-overlay-backdrop"
+                        onClick={() => setSelectedElement(null)}
+                    />
+                    <div className="timeline-overlay-modal">
+                        <div className="timeline-overlay-header">
+                            <span>Информация о событии</span>
+                            <button
+                                className="timeline-overlay-close"
+                                onClick={() => setSelectedElement(null)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="timeline-overlay-body">
+                            {renderSelectedElementInfo()}
+                        </div>
+                        <div className="timeline-overlay-footer">
+                            <Button onClick={() => setSelectedElement(null)}>
+                                Закрыть
+                            </Button>
+                            {selectedElement.meta && (
+                                <Button danger onClick={handleDeleteSelectedElement}>
+                                    Удалить
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

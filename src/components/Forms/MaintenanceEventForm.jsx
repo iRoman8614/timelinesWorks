@@ -111,6 +111,66 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         form.setFieldsValue({ maintenanceTypeId: undefined });
     };
 
+    const resolveUnitIdForComponent = (assemblyId, componentId) => {
+        const assignedUnitId = getCurrentUnitForComponent(assemblyId, componentId);
+        if (assignedUnitId) {
+            return assignedUnitId;
+        }
+        const assembly = getAssemblyInfo(assemblyId);
+        if (!assembly) return null;
+        const assemblyType = getAssemblyType(assembly.assemblyTypeId);
+        if (!assemblyType) return null;
+        const component = assemblyType.components.find(c => c.id === componentId);
+        if (!component) return null;
+        const componentTypeId = component.componentTypeId;
+        if (!componentTypeId) return null;
+        const partModelWithUnits = project.partModels?.find(
+            pm => pm.componentTypeId === componentTypeId && pm.units && pm.units.length > 0
+        );
+        if (!partModelWithUnits) return null;
+        return partModelWithUnits.units[0].id;
+    };
+
+
+    // const handleFinish = (values) => {
+    //     const assembly = getAssemblyInfo(values.assemblyId);
+    //     if (!assembly) {
+    //         message.error('Агрегат не найден');
+    //         return;
+    //     }
+    //
+    //     const assemblyType = getAssemblyType(assembly.assemblyTypeId);
+    //     console.log('assemblyType', assemblyType)
+    //     console.log('assembly', assembly)
+    //     const component = assemblyType?.components.find(c => c.id === values.componentId);
+    //     console.log('componentId', values.componentId)
+    //     console.log('component', component)
+    //     if (!component) {
+    //         message.error('Компонент не найден');
+    //         return;
+    //     }
+    //
+    //     // Создаём специальный unitId для работ без привязки к конкретному Unit
+    //     const virtualUnitId = `${values.componentId}`;
+    //
+    //     const eventData = {
+    //         maintenanceTypeId: values.maintenanceTypeId,
+    //         unitId: virtualUnitId,
+    //         componentOfAssembly: {
+    //             assemblyId: values.assemblyId,
+    //             componentPath: [values.componentId]
+    //         },
+    //         dateTime: values.dateTime.format('YYYY-MM-DDTHH:mm:ss'),
+    //         custom: true
+    //     };
+    //
+    //     onSubmit(eventData);
+    //     form.resetFields();
+    //     setSelectedAssembly(null);
+    //     setSelectedComponent(null);
+    //     message.success('Внеплановая работа добавлена');
+    // };
+
     const handleFinish = (values) => {
         const assembly = getAssemblyInfo(values.assemblyId);
         if (!assembly) {
@@ -125,13 +185,15 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
             return;
         }
 
-        // Создаём специальный unitId для работ без привязки к конкретному Unit
-        // Используем формат: "component-{componentId}"
-        const virtualUnitId = `component-${values.componentId}`;
+        const unitId = resolveUnitIdForComponent(values.assemblyId, values.componentId);
+        if (!unitId) {
+            message.error('Не удалось определить Unit для выбранного компонента');
+            return;
+        }
 
         const eventData = {
             maintenanceTypeId: values.maintenanceTypeId,
-            unitId: virtualUnitId,
+            unitId,
             componentOfAssembly: {
                 assemblyId: values.assemblyId,
                 componentPath: [values.componentId]
@@ -146,6 +208,7 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         setSelectedComponent(null);
         message.success('Внеплановая работа добавлена');
     };
+
     const selectedAssemblyInfo = selectedAssembly ? getAssemblyInfo(selectedAssembly) : null;
     const selectedAssemblyType = selectedAssemblyInfo ? getAssemblyType(selectedAssemblyInfo.assemblyTypeId) : null;
 

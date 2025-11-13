@@ -1,5 +1,5 @@
 //const API_BASE = process.env.REACT_APP_API_BASE_URL;
-const API_BASE = `${process.env.REACT_APP_API_BASE_URL}/projects`;
+const API_BASE = `${process.env.REACT_APP_API_BASE_URL}/api/projects`;
 
 const serializeProject = (project) => ({
     id: project.id,

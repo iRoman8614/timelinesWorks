@@ -111,6 +111,10 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
         setError(null);
     }, []);
 
+    const bumpTimelineVersion = () => {
+        setTimelineVersion(prev => prev + 1);
+    };
+
     return {
         isGenerating,
         progress,
@@ -119,6 +123,7 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
         timelineVersion,
         generatePlan,
         cancelGeneration,
+        bumpTimelineVersion,
         clearError,
         isConnected: fluxService.isConnected(),
     };

@@ -31,7 +31,7 @@ class FluxService {
         this.abortController = new AbortController();
 
         //const url = `http://localhost:5000/api/optimizer/flux?start=${startDate}&end=${endDate}`;
-        const url = `${API_BASE}/optimizer/flux?start=${startDate}&end=${endDate}`;
+        const url = `${API_BASE}/api/optimizer/flux?start=${startDate}&end=${endDate}`;
 
 
         let lastTimeline = null;
@@ -56,83 +56,9 @@ class FluxService {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 },
 
-                // async onmessage(event) {
-                //     console.log('📨 Получено SSE событие:', event);
-                //
-                //     // helper: пытаемся привести payload к таймлайну
-                //     const normalizeAsTimeline = (obj) => {
-                //         if (!obj || typeof obj !== 'object') return null;
-                //         if (obj.timeline && typeof obj.timeline === 'object') {
-                //             const tl = obj.timeline;
-                //             return {
-                //                 assemblyStates: tl.assemblyStates || [],
-                //                 unitAssignments: tl.unitAssignments || [],
-                //                 maintenanceEvents: tl.maintenanceEvents || []
-                //             };
-                //         }
-                //         const hasAny =
-                //             'assemblyStates' in obj || 'unitAssignments' in obj || 'maintenanceEvents' in obj;
-                //         if (hasAny) {
-                //             return {
-                //                 assemblyStates: obj.assemblyStates || [],
-                //                 unitAssignments: obj.unitAssignments || [],
-                //                 maintenanceEvents: obj.maintenanceEvents || []
-                //             };
-                //         }
-                //         return null;
-                //     };
-                //
-                //     try {
-                //         const parsed = (() => {
-                //             try { return JSON.parse(event.data); } catch { return event.data; }
-                //         })();
-                //
-                //         // 1) именованные события
-                //         if (event.event === 'progress') {
-                //             const msg = typeof parsed === 'object'
-                //                 ? (parsed.message || parsed.status || event.data)
-                //                 : String(parsed);
-                //             onProgress(msg);
-                //             return;
-                //         }
-                //         if (event.event === 'timeline-update') {
-                //             const tl = normalizeAsTimeline(parsed);
-                //             if (tl) {
-                //                 lastTimeline = tl;
-                //                 onTimelineUpdate(tl);
-                //             }
-                //             return;
-                //         }
-                //         if (event.event === 'complete' || event.event === 'done') {
-                //             const tl = normalizeAsTimeline(parsed) || parsed;
-                //             lastTimeline = tl;
-                //             onComplete(tl);
-                //             return;
-                //         }
-                //
-                //         // 2) дефолтные (без типа)
-                //         const tl = normalizeAsTimeline(parsed);
-                //         if (tl) {
-                //             lastTimeline = tl;
-                //             onTimelineUpdate(tl);
-                //             return;
-                //         }
-                //
-                //         // 3) иначе считаем прогрессом
-                //         onProgress(typeof parsed === 'object'
-                //             ? (parsed.message || parsed.status || JSON.stringify(parsed))
-                //             : String(parsed)
-                //         );
-                //     } catch (error) {
-                //         console.error('❌ Ошибка обработки события:', error);
-                //         onError(error);
-                //     }
-                // },
-
                 async onmessage(event) {
                     console.log('📨 Получено SSE событие:', event);
 
-                    // helper: пытаемся привести payload к таймлайну
                     const normalizeAsTimeline = (obj) => {
                         if (!obj || typeof obj !== 'object') return null;
                         if (obj.timeline && typeof obj.timeline === 'object') {
