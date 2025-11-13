@@ -1,31 +1,47 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Card, DatePicker, Space, Typography, Form, Select, Button, message } from 'antd';
+import { Card, DatePicker, Space, Typography, Form, Select, Button, message, InputNumber, Checkbox, Progress, Alert } from 'antd';
+import { LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
 import { getContrastTextColor } from '../../utils/contrastTextColor';
-import { generateMaintenancePlan } from '../../utils/maintenanceScheduler';
+import { useFluxTimelineGeneration } from '../../hooks/useFluxTimelineGeneraion';
 import dayjs from 'dayjs';
-import {MaintenanceEventForm} from '../Forms/index';
+import { MaintenanceEventForm } from '../Forms/index';
+import { dataService } from '../../services/dataService';
+
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const ASSIGNMENT_DATETIME_FORMAT = 'YYYY-MM-DDTHH:mm:ss';
 
-const TimelineTab = ({ project, onProjectUpdate }) => {
+const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     const [zoom, setZoom] = useState(30);
     const [assignmentForm] = Form.useForm();
     const [openTracks, setOpenTracks] = useState({});
-    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-    const [generationStatus, setGenerationStatus] = useState(null);
+    const [includeOperatingInterval, setIncludeOperatingInterval] = useState(false);
+
+    // Flux генерация
+    const {
+        isGenerating,
+        progress,
+        error: fluxError,
+        timeline: fluxTimeline,
+        generatePlan,
+        cancelGeneration,
+        clearError
+    } = useFluxTimelineGeneration();
 
     const timeline = project?.timeline || {};
+
+    const projectStart = project?.start;
+    const projectEnd = project?.end;
 
     const currentYear = dayjs().year();
     const defaultStart = dayjs().year(currentYear).startOf('year');
     const defaultEnd = dayjs().year(currentYear).endOf('year');
 
-    const rawTimelineStart = timeline.start ? dayjs(timeline.start) : null;
-    const rawTimelineEnd = timeline.end ? dayjs(timeline.end) : null;
+    const rawTimelineStart = projectStart ? dayjs(projectStart) : null;
+    const rawTimelineEnd = projectEnd ? dayjs(projectEnd) : null;
 
     const timelineStartDayjs = rawTimelineStart && rawTimelineStart.isValid()
         ? rawTimelineStart.startOf('day')
@@ -44,6 +60,22 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
     const timelineStartDate = timelineStartDayjs.startOf('day').toDate();
     const timelineEndDate = timelineEndDayjs.endOf('day').toDate();
 
+    // Обработка обновлений таймлайна из Flux
+    React.useEffect(() => {
+        if (!fluxTimeline || !onProjectUpdate) return;
+        console.log('📝 Применяем полученный от Flux таймлайн в проект');
+        onProjectUpdate({ ...project, timeline: fluxTimeline });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fluxTimeline, onProjectUpdate, project]);
+
+
+    // Обработка ошибок Flux
+    React.useEffect(() => {
+        if (fluxError) {
+            message.error(fluxError);
+        }
+    }, [fluxError]);
+
     const getStateColor = (stateType) => {
         const colors = {
             'WORKING': '#52c41a',
@@ -55,20 +87,18 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
     };
 
     const getMaintenanceColor = (maintenanceType) => {
-        // Если есть кастомный цвет - используем его
         if (maintenanceType?.color) {
             return maintenanceType.color;
         }
-        // Иначе используем цвет по умолчанию
         return '#8c8c8c';
     };
 
     const zoomIn = useCallback(() => {
-        setZoom(prev => Math.min(prev + 2, 40)); // Увеличиваем до 40
+        setZoom(prev => Math.min(prev + 2, 40));
     }, []);
 
     const zoomOut = useCallback(() => {
-        setZoom(prev => Math.max(prev - 2, 5)); // Минимум 5
+        setZoom(prev => Math.max(prev - 2, 5));
     }, []);
 
     const clickElement = useCallback((element) => {
@@ -166,30 +196,53 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         return options;
     }, [project?.partModels]);
 
+    // Функция для получения MaintenanceType по ID
+    const getMaintenanceType = useCallback((maintenanceTypeId) => {
+        const allMaintenanceTypes = [];
+        project?.partModels?.forEach(pm => {
+            if (pm.maintenanceTypes) {
+                allMaintenanceTypes.push(...pm.maintenanceTypes);
+            }
+        });
+        return allMaintenanceTypes.find(mt => mt.id === maintenanceTypeId);
+    }, [project?.partModels]);
+
+    // Функция для получения Unit по ID
+    const getUnitById = useCallback((unitId) => {
+        return project?.partModels?.flatMap(pm => pm.units || [])
+            .find(u => u.id === unitId);
+    }, [project?.partModels]);
+
+    // Функция для получения Assembly по ID
+    const getAssemblyById = useCallback((assemblyId) => {
+        const findAssembly = (nodes) => {
+            for (const node of nodes) {
+                if (node.id === assemblyId) {
+                    return node;
+                }
+                if (node.children) {
+                    const found = findAssembly(node.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        return findAssembly(project?.nodes || []);
+    }, [project?.nodes]);
+
+    // НОВАЯ ЛОГИКА: Строим треки только из данных timeline
     const tracks = useMemo(() => {
-        if (!project || !project.nodes) {
+        if (!project || !project.nodes || project.nodes.length === 0) {
             return [];
         }
 
         const fallbackTimelineEndDate = dayjs(timelineEndKey).endOf('day').toDate();
-
         const allTracks = [];
 
-        // Функция для получения информации о компонентах из AssemblyType
+        // Функция для получения компонентов из AssemblyType
         const getComponentsForAssembly = (assemblyTypeId) => {
             const assemblyType = project.assemblyTypes?.find(at => at.id === assemblyTypeId);
             return assemblyType?.components || [];
-        };
-
-        // Функция для получения MaintenanceType по ID
-        const getMaintenanceType = (maintenanceTypeId) => {
-            const allMaintenanceTypes = [];
-            project.partModels?.forEach(pm => {
-                if (pm.maintenanceTypes) {
-                    allMaintenanceTypes.push(...pm.maintenanceTypes);
-                }
-            });
-            return allMaintenanceTypes.find(mt => mt.id === maintenanceTypeId);
         };
 
         // Рекурсивная функция для обработки узлов
@@ -205,11 +258,8 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
 
             if (node.children) {
                 node.children.forEach(child => {
-                    if (child.assemblyTypeId) {
-                        const assemblyTrack = processAssembly({
-                            ...child,
-                            type: 'ASSEMBLY'
-                        });
+                    if (child.type === 'ASSEMBLY' || child.assemblyTypeId) {
+                        const assemblyTrack = processAssembly(child);
                         track.tracks.push(assemblyTrack);
                     } else if (child.children) {
                         const childTrack = processNode(child);
@@ -232,354 +282,240 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                 toggleOpen: () => {}
             };
 
-            // Получаем состояния агрегата
+            // Получаем состояния агрегата (если есть)
             const assemblyStates = timeline.assemblyStates?.filter(
                 state => state.assemblyId === assembly.id
             ) || [];
 
             // Добавляем состояния как фоновые элементы
-            assemblyStates.forEach((state, index) => {
-                const stateStart = new Date(state.dateTime);
-                const stateEnd = assemblyStates[index + 1]
-                    ? new Date(assemblyStates[index + 1].dateTime)
-                    : fallbackTimelineEndDate;
+            if (assemblyStates.length > 0) {
+                assemblyStates.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+                assemblyStates.forEach((state, index) => {
+                    const stateStart = new Date(state.dateTime);
+                    const stateEnd = assemblyStates[index + 1]
+                        ? new Date(assemblyStates[index + 1].dateTime)
+                        : fallbackTimelineEndDate;
 
-                const startDateStr = stateStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-                const endDateStr = stateEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-                const stateNames = {
-                    'WORKING': 'Работает',
-                    'IDLE': 'Простой',
-                    'SHUTTING_DOWN': 'Останавливается',
-                    'STARTING_UP': 'Запусчкается'
-                };
-                const stateName = stateNames[state.type] || state.type;
-                const tooltipText = `${stateName}\n${startDateStr} - ${endDateStr}`;
+                    const startDateStr = stateStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                    const endDateStr = stateEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                    const stateNames = {
+                        'WORKING': 'Работает',
+                        'IDLE': 'Простой',
+                        'SHUTTING_DOWN': 'Останов',
+                        'STARTING_UP': 'Запуск'
+                    };
 
-                const bgColor = getStateColor(state.type);
-                const textColor = getContrastTextColor(bgColor);
-
-                assemblyTrack.elements.push({
-                    id: `state-${assembly.id}-${index}`,
-                    title: stateName,
-                    start: stateStart,
-                    end: stateEnd,
-                    style: {
-                        backgroundColor: bgColor,
-                        borderRadius: '4px',
-                        opacity: 0.5,
-                        border: 'none',
-                        color: textColor,
-                        fontSize: '11px',
-                        fontWeight: '600'
-                    },
-                    dataTitle: tooltipText
-                });
-            });
-
-            const components = getComponentsForAssembly(assembly.assemblyTypeId);
-
-            components.forEach(component => {
-                // Находим последний назначенный Unit для отображения в заголовке
-                const componentAssignments = (timeline.unitAssignments || [])
-                    .filter(ua =>
-                        ua.componentOfAssembly?.assemblyId === assembly.id &&
-                        ua.componentOfAssembly?.componentPath?.includes(component.id)
-                    )
-                    .sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
-
-                const latestAssignment = componentAssignments[0];
-                let trackTitle = component.name;
-
-                if (latestAssignment) {
-                    const unitInfo = project.partModels?.flatMap(pm => pm.units || [])
-                        .find(u => u.id === latestAssignment.unitId);
-                    if (unitInfo) {
-                        trackTitle = `${component.name} [${unitInfo.serialNumber}]`;
-                    }
-                }
-
-                const componentTrack = {
-                    id: `${assembly.id}-${component.id}`,
-                    title: trackTitle,
-                    elements: [],
-                    tracks: [],
-                    //isOpen: openTracks[`${assembly.id}-${component.id}`] !== false,
-                    toggleOpen: () => {}
-                };
-
-                // Находим все UnitAssignments для этого компонента, отсортированные по времени
-                const assignmentsForComponent = (timeline.unitAssignments || [])
-                    .filter(ua =>
-                        ua.componentOfAssembly?.assemblyId === assembly.id &&
-                        ua.componentOfAssembly?.componentPath?.includes(component.id)
-                    )
-                    .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-
-                // Добавляем маркеры замены юнитов
-                assignmentsForComponent.forEach((assignment, index) => {
-                    const assignmentDate = new Date(assignment.dateTime);
-
-                    // Находим информацию о юните
-                    const unitInfo = project.partModels?.flatMap(pm => pm.units || [])
-                        .find(u => u.id === assignment.unitId);
-
-                    if (unitInfo) {
-                        const unitName = unitInfo.name || unitInfo.serialNumber || 'Unit';
-                        const markerEnd = new Date(assignmentDate.getTime() + 1000 * 60 * 60); // 1 час для видимости
-
-                        componentTrack.elements.push({
-                            id: `assignment-${assignment.unitId}-${assignment.dateTime}`,
-                            title: `▼ ${unitName}`,
-                            start: assignmentDate,
-                            end: markerEnd,
-                            style: {
-                                backgroundColor: '#722ed1',
-                                color: '#ffffff',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: '600',
-                                border: '2px solid #531dab',
-                                zIndex: 10
-                            },
-                            dataTitle: `Замена юнита: ${unitName}\n${assignmentDate.toLocaleDateString('ru-RU', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            })}`
-                        });
-                    }
-                });
-
-                // Определяем активный Unit для компонента на каждый период
-// Определяем активный Unit для компонента на каждый период
-                assignmentsForComponent.forEach((assignment, index) => {
-                    const activeUnitId = assignment.unitId;
-
-                    // Находим все MaintenanceEvent для этого Unit
-                    const maintenanceEvents = timeline.maintenanceEvents?.filter(
-                        me => me.unitId === activeUnitId
-                    ) || [];
-
-                    maintenanceEvents.forEach(event => {
-                        const maintenanceType = getMaintenanceType(event.maintenanceTypeId);
-                        if (maintenanceType) {
-                            const eventStart = new Date(event.dateTime);
-                            const eventEnd = new Date(eventStart);
-                            eventEnd.setDate(eventEnd.getDate() + maintenanceType.duration);
-
-                            const startDateStr = eventStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-                            const endDateStr = eventEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-                            const tooltipText = `${maintenanceType.name}\n${startDateStr} - ${endDateStr}\nДлительность: ${maintenanceType.duration} дн.`;
-
-                            const bgColor = getMaintenanceColor(maintenanceType);
-                            const textColor = getContrastTextColor(bgColor);
-
-                            componentTrack.elements.push({
-                                id: event.maintenanceTypeId + '-' + event.dateTime,
-                                title: maintenanceType.name,
-                                start: eventStart,
-                                end: eventEnd,
-                                style: {
-                                    backgroundColor: bgColor,
-                                    borderRadius: '4px',
-                                    color: textColor,
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    border: 'none'
-                                },
-                                dataTitle: tooltipText
-                            });
+                    assemblyTrack.elements.push({
+                        id: `state-${assembly.id}-${index}`,
+                        title: `${stateNames[state.type] || state.type}`,
+                        dataTitle: `${stateNames[state.type] || state.type}: ${startDateStr} - ${endDateStr}`,
+                        start: stateStart,
+                        end: stateEnd,
+                        style: {
+                            backgroundColor: getStateColor(state.type),
+                            color: getContrastTextColor(getStateColor(state.type)),
+                            border: 'none',
+                            borderRadius: '4px',
+                            opacity: 0.3
                         }
                     });
                 });
+            }
 
-// ДОБАВИТЬ ЭТОТ НОВЫЙ БЛОК - для событий с виртуальным unitId (привязанных к компоненту)
-                const virtualUnitId = `component-${component.id}`;
-                const componentMaintenanceEvents = timeline.maintenanceEvents?.filter(
-                    me => me.unitId === virtualUnitId
+            // Получаем компоненты агрегата
+            const components = getComponentsForAssembly(assembly.assemblyTypeId);
+
+            // Создаем треки для каждого компонента
+            components.forEach(component => {
+                const componentTrack = {
+                    id: `${assembly.id}-${component.id}`,
+                    title: component.name,
+                    elements: [],
+                    tracks: [],
+                    isOpen: true,
+                    toggleOpen: () => {}
+                };
+
+                // Получаем все unitAssignments для этого компонента
+                const componentAssignments = timeline.unitAssignments?.filter(ua =>
+                    ua.componentOfAssembly?.assemblyId === assembly.id &&
+                    ua.componentOfAssembly?.componentPath?.includes(component.id)
                 ) || [];
 
-                componentMaintenanceEvents.forEach(event => {
-                    const maintenanceType = getMaintenanceType(event.maintenanceTypeId);
-                    if (maintenanceType) {
-                        const eventStart = new Date(event.dateTime);
-                        const eventEnd = new Date(eventStart);
-                        eventEnd.setDate(eventEnd.getDate() + maintenanceType.duration);
+                // Сортируем по дате
+                componentAssignments.sort((a, b) =>
+                    new Date(a.dateTime) - new Date(b.dateTime)
+                );
 
-                        const startDateStr = eventStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-                        const endDateStr = eventEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-                        const tooltipText = `${maintenanceType.name}\n${startDateStr} - ${endDateStr}\nДлительность: ${maintenanceType.duration} дн.`;
+                // Добавляем unitAssignments как метки (точки на таймлайне)
+                componentAssignments.forEach((assignment, index) => {
+                    const assignmentDate = new Date(assignment.dateTime);
+                    const unit = getUnitById(assignment.unitId);
 
-                        const bgColor = getMaintenanceColor(maintenanceType);
-                        const textColor = getContrastTextColor(bgColor);
+                    if (unit) {
+                        const dateStr = assignmentDate.toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+
+                        const operatingIntervalText = assignment.operatingInterval
+                            ? ` | Наработка: ${assignment.operatingInterval} ч`
+                            : '';
+
+                        // Метка - очень короткий интервал (1 час)
+                        const markerEnd = new Date(assignmentDate.getTime() + 60 * 60 * 1000);
 
                         componentTrack.elements.push({
-                            id: event.maintenanceTypeId + '-' + event.dateTime,
-                            title: maintenanceType.name,
-                            start: eventStart,
-                            end: eventEnd,
+                            id: `assignment-${assignment.unitId}-${index}`,
+                            title: '◆',
+                            dataTitle: `Замена: ${unit.name} (${unit.serialNumber || 'б/н'}) - ${dateStr}${operatingIntervalText}`,
+                            start: assignmentDate,
+                            end: markerEnd,
                             style: {
-                                backgroundColor: bgColor,
-                                borderRadius: '4px',
-                                color: textColor,
-                                fontSize: '11px',
-                                fontWeight: '500',
-                                border: 'none'
-                            },
-                            dataTitle: tooltipText
+                                backgroundColor: '#003a8c',
+                                color: '#ffffff',
+                                border: '2px solid #001529',
+                                borderRadius: '2px',
+                                fontWeight: 'bold',
+                                fontSize: '16px',
+                                textAlign: 'center'
+                            }
+                        });
+
+                        // Добавляем события ТО для этого Unit на этот же трек компонента
+                        const assignmentEnd = componentAssignments[index + 1]
+                            ? new Date(componentAssignments[index + 1].dateTime)
+                            : fallbackTimelineEndDate;
+
+                        const maintenanceEvents = timeline.maintenanceEvents?.filter(
+                            me => me.unitId === assignment.unitId &&
+                                new Date(me.dateTime) >= assignmentDate &&
+                                new Date(me.dateTime) <= assignmentEnd
+                        ) || [];
+
+                        maintenanceEvents.forEach((event, eventIndex) => {
+                            const maintenanceType = getMaintenanceType(event.maintenanceTypeId);
+                            if (maintenanceType) {
+                                const eventStart = new Date(event.dateTime);
+                                const eventEnd = new Date(eventStart.getTime() + maintenanceType.duration * 24 * 60 * 60 * 1000);
+
+                                const eventStartStr = eventStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                                const eventEndStr = eventEnd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+                                componentTrack.elements.push({
+                                    id: `maintenance-${assignment.unitId}-${event.dateTime}-${eventIndex}`,
+                                    title: maintenanceType.name,
+                                    dataTitle: `${maintenanceType.name}: ${eventStartStr} - ${eventEndStr} (${maintenanceType.duration} дн.)${event.custom ? ' [Внеплановое]' : ''}`,
+                                    start: eventStart,
+                                    end: eventEnd,
+                                    style: {
+                                        backgroundColor: getMaintenanceColor(maintenanceType),
+                                        color: getContrastTextColor(getMaintenanceColor(maintenanceType)),
+                                        border: `2px solid ${getMaintenanceColor(maintenanceType)}`,
+                                        borderRadius: '4px',
+                                        opacity: event.custom ? 0.7 : 0.9
+                                    }
+                                });
+                            }
                         });
                     }
                 });
+
                 assemblyTrack.tracks.push(componentTrack);
             });
 
             return assemblyTrack;
         };
 
+        // Обрабатываем все корневые узлы
         project.nodes.forEach(node => {
-            const track = processNode(node);
-            allTracks.push(track);
+            if (node.type === 'NODE') {
+                const track = processNode(node);
+                allTracks.push(track);
+            } else if (node.type === 'ASSEMBLY' || node.assemblyTypeId) {
+                const track = processAssembly(node);
+                allTracks.push(track);
+            }
         });
 
         return allTracks;
-    }, [project, timeline, timelineEndKey, openTracks, toggleTrackOpen]);
+    }, [project, timeline, openTracks, timelineEndKey, getMaintenanceType, getUnitById, getAssemblyById, assemblyTypeMap]);
 
-    const now = new Date();
+    const timebar = useMemo(() => {
+        const startDate = timelineStartDate;
+        const endDate = timelineEndDate;
 
-    const generateDaysInRange = (startDate, endDate) => {
-        const days = [];
-        let current = dayjs(startDate).startOf('day');
-        const endDay = dayjs(endDate).startOf('day');
+        const timebars = [];
 
-        while (current.isBefore(endDay) || current.isSame(endDay, 'day')) {
-            const next = current.add(1, 'day');
-            const currentNative = current.toDate();
-
-            const dayNum = currentNative.getDate();
-            const monthShort = currentNative.toLocaleDateString('ru-RU', { month: 'short' });
-
-            days.push({
-                id: `day-${current.valueOf()}`,
-                title: dayNum === 1 ? `${dayNum} ${monthShort}` : dayNum.toString(),
-                start: currentNative,
-                end: next.toDate()
-            });
-
-            current = next;
-        }
-
-        return days;
-    };
-
-    const generateMonthsInRange = (startDate, endDate) => {
+        // Месяцы
         const months = [];
-        let current = dayjs(startDate).startOf('month');
-        const endMonth = dayjs(endDate).startOf('month');
-        const showYear = dayjs(startDate).year() !== dayjs(endDate).year();
-
-        while (current.isBefore(endMonth) || current.isSame(endMonth, 'month')) {
-            const next = current.add(1, 'month');
-            const titleOptions = { month: 'long' };
-            if (showYear) {
-                titleOptions.year = 'numeric';
-            }
-
+        let currentMonth = dayjs(startDate).startOf('month');
+        while (currentMonth.isBefore(endDate)) {
             months.push({
-                id: `month-${current.year()}-${current.month()}`,
-                title: current.toDate().toLocaleDateString('ru-RU', titleOptions),
-                start: current.toDate(),
-                end: next.toDate()
+                id: `month-${currentMonth.format('YYYY-MM')}`,
+                title: currentMonth.format('MMM YYYY'),
+                start: currentMonth.toDate(),
+                end: currentMonth.endOf('month').toDate()
             });
-
-            current = next;
+            currentMonth = currentMonth.add(1, 'month');
         }
 
-        return months;
-    };
-
-    const timebar = useMemo(() => ([
-        {
-            id: 'months',
-            title: 'Месяцы',
-            cells: generateMonthsInRange(timelineStartDate, timelineEndDate),
-            style: {}
-        },
-        {
-            id: 'days',
-            title: 'Дни',
-            cells: generateDaysInRange(timelineStartDate, timelineEndDate),
-            style: {}
-        }
-    ]), [timelineStartKey, timelineEndKey]);
-
-    const handleStartChange = useCallback((value) => {
-        if (!value || !project || !onProjectUpdate) {
-            return;
+        if (months.length > 0) {
+            timebars.push({
+                id: 'months',
+                title: 'Месяцы',
+                cells: months,
+                style: {},
+                useAsGrid: false
+            });
         }
 
-        const normalizedStart = value.startOf('day');
-        const newStart = normalizedStart.format(DATE_FORMAT);
-
-        const existingEnd = timeline.end ? dayjs(timeline.end) : null;
-        const normalizedEnd = existingEnd && existingEnd.isValid() && !existingEnd.isBefore(normalizedStart)
-            ? existingEnd.startOf('day')
-            : normalizedStart;
-        const newEnd = normalizedEnd.format(DATE_FORMAT);
-
-        if (timeline.start === newStart && timeline.end === newEnd) {
-            return;
+        // Дни
+        const days = [];
+        let currentDay = dayjs(startDate).startOf('day');
+        while (currentDay.isBefore(endDate)) {
+            days.push({
+                id: `day-${currentDay.format('YYYY-MM-DD')}`,
+                title: currentDay.format('D'),
+                start: currentDay.toDate(),
+                end: currentDay.endOf('day').toDate()
+            });
+            currentDay = currentDay.add(1, 'day');
         }
 
+        if (days.length > 0) {
+            timebars.push({
+                id: 'days',
+                title: 'Дни',
+                cells: days,
+                style: {},
+                useAsGrid: true
+            });
+        }
+
+        return timebars;
+    }, [timelineStartDate, timelineEndDate]);
+    const now = useMemo(() => new Date(), []);
+
+    const handleStartChange = useCallback((date) => {
+        if (!date || !onProjectUpdate) return;
         onProjectUpdate({
             ...project,
-            timeline: {
-                ...timeline,
-                start: newStart,
-                end: newEnd,
-                assemblyStates: timeline.assemblyStates || [],
-                unitAssignments: timeline.unitAssignments || [],
-                maintenanceEvents: timeline.maintenanceEvents || []
-            }
+            start: date.format(DATE_FORMAT),
+            timeline: { ...timeline }
         });
-    }, [onProjectUpdate, project, timeline]);
+    }, [project, timeline, onProjectUpdate]);
 
-    const handleEndChange = useCallback((value) => {
-        if (!value || !project || !onProjectUpdate) {
-            return;
-        }
-
-        const normalizedEnd = value.startOf('day');
-        const newEnd = normalizedEnd.format(DATE_FORMAT);
-
-        const existingStart = timeline.start ? dayjs(timeline.start) : null;
-        const normalizedStart = existingStart && existingStart.isValid() && !normalizedEnd.isBefore(existingStart)
-            ? existingStart.startOf('day')
-            : normalizedEnd;
-        const newStart = normalizedStart.format(DATE_FORMAT);
-
-        if (timeline.start === newStart && timeline.end === newEnd) {
-            return;
-        }
-
+    const handleEndChange = useCallback((date) => {
+        if (!date || !onProjectUpdate) return;
         onProjectUpdate({
             ...project,
-            timeline: {
-                ...timeline,
-                start: newStart,
-                end: newEnd,
-                assemblyStates: timeline.assemblyStates || [],
-                unitAssignments: timeline.unitAssignments || [],
-                maintenanceEvents: timeline.maintenanceEvents || []
-            }
+            end: date.format(DATE_FORMAT),
+            timeline: { ...timeline }
         });
-    }, [onProjectUpdate, project, timeline]);
-
-    const hasTimelineData = Boolean(project) && Array.isArray(tracks) && tracks.length > 0;
-    const scaleEnd = timelineEndDate <= timelineStartDate
-        ? dayjs(timelineStartDate).add(1, 'day').toDate()
-        : timelineEndDate;
+    }, [project, timeline, onProjectUpdate]);
 
     const handleAssignmentSubmit = useCallback((values) => {
         if (!project || !onProjectUpdate) {
@@ -622,7 +558,8 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             },
             dateTime: values.dateTime
                 ? values.dateTime.format(ASSIGNMENT_DATETIME_FORMAT)
-                : dayjs().format(ASSIGNMENT_DATETIME_FORMAT)
+                : dayjs().format(ASSIGNMENT_DATETIME_FORMAT),
+            operatingInterval: includeOperatingInterval ? values.operatingInterval : null
         };
 
         const existingAssignments = timeline.unitAssignments || [];
@@ -633,8 +570,6 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             ...project,
             timeline: {
                 ...timeline,
-                start: timeline.start || timelineStartKey,
-                end: timeline.end || timelineEndKey,
                 assemblyStates: timeline.assemblyStates || [],
                 unitAssignments: updatedAssignments,
                 maintenanceEvents: timeline.maintenanceEvents || []
@@ -642,8 +577,9 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
         });
 
         assignmentForm.resetFields();
+        setIncludeOperatingInterval(false);
         message.success('Назначение детали добавлено');
-    }, [assignmentForm, assemblyOptionMap, assemblyTypeMap, onProjectUpdate, project, timeline, timelineEndKey, timelineStartKey, unitOptions]);
+    }, [assignmentForm, assemblyOptionMap, assemblyTypeMap, onProjectUpdate, project, timeline, unitOptions, includeOperatingInterval]);
 
     const handleMaintenanceEventSubmit = useCallback((values) => {
         if (!project || !onProjectUpdate) {
@@ -665,66 +601,92 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
             ...project,
             timeline: {
                 ...timeline,
-                start: timeline.start || timelineStartKey,
-                end: timeline.end || timelineEndKey,
                 assemblyStates: timeline.assemblyStates || [],
                 unitAssignments: timeline.unitAssignments || [],
                 maintenanceEvents: updatedEvents
             }
         });
-    }, [onProjectUpdate, project, timeline, timelineEndKey, timelineStartKey]);
+
+        message.success('Внеплановая работа добавлена');
+    }, [onProjectUpdate, project, timeline]);
+
+    /**
+     * Обработчик генерации плана через Flux
+     */
+    // const handleGeneratePlan = useCallback(async () => {
+    //     if (!project) {
+    //         message.error('Проект не загружен');
+    //         return;
+    //     }
+    //
+    //     try {
+    //         await generatePlan(project, (generatedTimeline) => {
+    //             message.success('План ТО успешно сгенерирован');
+    //         });
+    //     } catch (error) {
+    //         console.error('Error generating plan:', error);
+    //         message.error('Ошибка при генерации плана ТО');
+    //     }
+    // }, [project, generatePlan]);
+
+    /**
+     * Обработчик генерации плана через Flux
+     */
+    const handleGeneratePlan = useCallback(async () => {
+        console.log('🎯 handleGeneratePlan вызван');
+        console.log('📦 project:', project);
+
+        if (!project) {
+            console.error('❌ Проект не загружен');
+            message.error('Проект не загружен');
+            return;
+        }
+
+        // Проверяем наличие дат в проекте
+        if (!project.start || !project.end) {
+            console.error('❌ У проекта отсутствуют даты');
+            message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
+            return;
+        }
+
+        console.log('✅ Проект загружен, вызываем generatePlan...');
+
+        try {
+            await generatePlan(project, (generatedTimeline) => {
+                console.log('🎉 План ТО успешно сгенерирован:', generatedTimeline);
+                message.success('План ТО успешно сгенерирован');
+            });
+        } catch (error) {
+            console.error('❌ Error generating plan:', error);
+            message.error('Ошибка при генерации плана ТО');
+        }
+    }, [project, generatePlan]);
 
     const hasAssemblies = assemblyOptions.length > 0;
     const hasUnits = unitOptions.some(option => option.componentTypeId);
     const assignmentDisabled = !hasAssemblies;
     const showUnitsHint = hasAssemblies && !hasUnits;
 
-    const handleClearTimeline = useCallback(() => {
-        if (!project || !onProjectUpdate) {
-            return;
+    const hasTimelineData = tracks.length > 0;
+
+    const scaleEnd = timelineEndDate <= timelineStartDate
+        ? dayjs(timelineStartDate).add(1, 'day').toDate()
+        : timelineEndDate;
+
+    React.useEffect(() => {
+        // Перерисовываем данные после финиша: забираем свежий проект из localStorage
+        if (!project?.id || !onProjectUpdate) return;
+
+        // Перезапускать именно когда генерация закончилась и у нас что-то прилетело
+        if (isGenerating === false && fluxTimeline) {
+            dataService.getProject(project.id)
+                .then((fresh) => {
+                    console.log('♻️ Перезагружаем проект из localStorage после complete', fresh);
+                    onProjectUpdate(fresh);
+                })
+                .catch((e) => console.warn('Не удалось перечитать проект из localStorage:', e));
         }
-
-        onProjectUpdate({
-            ...project,
-            timeline: {
-                start: '2025-01-01',
-                end: '2025-12-31',
-                assemblyStates: [],
-                unitAssignments: [],
-                maintenanceEvents: []
-            }
-        });
-
-        message.success('Таймлайн очищен');
-    }, [project, onProjectUpdate]);
-
-    const handleGeneratePlan = useCallback(async () => {
-        if (!project || !onProjectUpdate) {
-            return;
-        }
-
-        setIsGeneratingPlan(true);
-        setGenerationStatus('Подготовка...');
-
-        try {
-            const newTimeline = await generateMaintenancePlan(project, (status) => {
-                setGenerationStatus(status);
-            });
-
-            onProjectUpdate({
-                ...project,
-                timeline: newTimeline
-            });
-
-            message.success('План ТО сгенерирован');
-        } catch (error) {
-            console.error('Ошибка генерации плана:', error);
-            message.error('Ошибка при генерации плана ТО');
-        } finally {
-            setIsGeneratingPlan(false);
-            setTimeout(() => setGenerationStatus(null), 1500);
-        }
-    }, [project, onProjectUpdate]);
+    }, [isGenerating, fluxTimeline, project?.id]);
 
 
     return (
@@ -754,14 +716,15 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     </Space>
                 </div>
             </Card>
+            {/* Форма назначения детали */}
             <Card className="timeline-assignment-card">
-                <Typography.Text className="timeline-assignment-title">Назначить деталь компоненту</Typography.Text>
+                <Typography.Text className="timeline-assignment-title">
+                    Назначить деталь компоненту
+                </Typography.Text>
                 <Form
                     form={assignmentForm}
                     layout="vertical"
                     onFinish={handleAssignmentSubmit}
-                    className="timeline-assignment-form"
-                    disabled={assignmentDisabled}
                 >
                     <Form.Item
                         name="assemblyId"
@@ -769,7 +732,8 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                         rules={[{ required: true, message: 'Выберите агрегат' }]}
                     >
                         <Select
-                            placeholder={assignmentDisabled ? 'Нет доступных агрегатов' : 'Выберите агрегат'}
+                            placeholder={assignmentDisabled ? 'Агрегаты недоступны' : 'Выберите агрегат'}
+                            disabled={assignmentDisabled}
                             options={assemblyOptions}
                             showSearch
                             optionFilterProp="label"
@@ -840,7 +804,7 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                                     return true;
                                 }
                                 if (option.componentTypeId == null) {
-                                    return true; // детали без типа доступны, но лучше перенастроить
+                                    return true;
                                 }
                                 return option.componentTypeId === componentTypeId;
                             });
@@ -870,6 +834,43 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                             );
                         }}
                     </Form.Item>
+
+                    {/* Поля для operatingInterval */}
+                    <Form.Item>
+                        <Checkbox
+                            checked={includeOperatingInterval}
+                            onChange={(e) => setIncludeOperatingInterval(e.target.checked)}
+                        >
+                            Указать наработку (часы)
+                        </Checkbox>
+                    </Form.Item>
+
+                    {includeOperatingInterval && (
+                        <Form.Item
+                            name="operatingInterval"
+                            label="Наработка (часы)"
+                            rules={[
+                                {
+                                    required: includeOperatingInterval,
+                                    message: 'Введите наработку'
+                                },
+                                {
+                                    type: 'number',
+                                    min: 0,
+                                    message: 'Наработка должна быть положительным числом'
+                                }
+                            ]}
+                            extra="Количество отработанных часов на момент установки детали"
+                        >
+                            <InputNumber
+                                min={0}
+                                placeholder="Введите наработку в часах"
+                                style={{ width: '100%' }}
+                                step={1}
+                            />
+                        </Form.Item>
+                    )}
+
                     <Form.Item
                         name="dateTime"
                         label="Дата и время назначения"
@@ -898,36 +899,74 @@ const TimelineTab = ({ project, onProjectUpdate }) => {
                     </Typography.Text>
                 )}
             </Card>
+
+            {/* Форма добавления внеплановой работы */}
             <Card className="timeline-assignment-card">
-                <Typography.Text className="timeline-assignment-title">Добавить внеплановую работу</Typography.Text>
+                <Typography.Text className="timeline-assignment-title">
+                    Добавить внеплановую работу
+                </Typography.Text>
                 <MaintenanceEventForm
                     project={project}
                     onSubmit={handleMaintenanceEventSubmit}
                 />
             </Card>
+
+
+            {/* Генерация плана через Flux */}
             <Card className="timeline-controls-card">
-                <Space>
-                    <Button
-                        type="primary"
-                        onClick={handleGeneratePlan}
-                        loading={isGeneratingPlan}
-                        disabled={isGeneratingPlan}
-                    >
-                        Сгенерировать план ТО
-                    </Button>
-                    {generationStatus && (
-                        <Typography.Text type="secondary">
-                            {generationStatus}
-                        </Typography.Text>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                    <Space>
+                        <Button
+                            type="primary"
+                            onClick={handleGeneratePlan}
+                            loading={isGenerating}
+                            disabled={isGenerating}
+                            icon={isGenerating ? <LoadingOutlined /> : null}
+                        >
+                            {isGenerating ? 'Генерация...' : 'Сгенерировать план ТО'}
+                        </Button>
+                        {isGenerating && (
+                            <Button
+                                danger
+                                onClick={cancelGeneration}
+                                icon={<CloseCircleOutlined />}
+                            >
+                                Отменить
+                            </Button>
+                        )}
+                    </Space>
+
+                    {/* Прогресс генерации */}
+                    {isGenerating && progress && (
+                        <Alert
+                            message="Генерация плана ТО"
+                            description={
+                                <Space direction="vertical" style={{ width: '100%' }}>
+                                    <Typography.Text>{progress}</Typography.Text>
+                                    <Progress percent={0} status="active" showInfo={false} />
+                                </Space>
+                            }
+                            type="info"
+                            showIcon
+                        />
                     )}
-                    {/*<Button*/}
-                    {/*    danger*/}
-                    {/*    onClick={handleClearTimeline}*/}
-                    {/*>*/}
-                    {/*    Очистить таймлайн*/}
-                    {/*</Button>*/}
+
+                    {/* Ошибка */}
+                    {fluxError && !isGenerating && (
+                        <Alert
+                            message="Ошибка генерации"
+                            description={fluxError}
+                            type="error"
+                            closable
+                            onClose={clearError}
+                            showIcon
+                        />
+                    )}
                 </Space>
             </Card>
+
+
+            {/* График таймлайна */}
             <Card className="timeline-chart">
                 {hasTimelineData ? (
                     <div className="timeline-wrapper">

@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -19,7 +20,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "react-scripts build",
+    "build:readable": "GENERATE_SOURCEMAP=true react-scripts build && npm run prettify-build",
+    "prettify-build": "cd build/static/js && for file in *.js; do npx prettier --write \"$file\"; done"
   },
   "eslintConfig": {
     "extends": [

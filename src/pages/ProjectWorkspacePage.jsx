@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {Layout, Typography, Button, Spin, Tabs, message, Modal, Space, Collapse, Table} from 'antd';
-import { ArrowLeftOutlined, SaveOutlined, SendOutlined, PlusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined } from '@ant-design/icons';
 import { dataService } from '../services/dataService';
 import TimelineTab from '../components/ProjectWorkspace/TimelineTab';
 import InstructionBlock from '../components/ProjectWorkspace/InstructionBlock';
