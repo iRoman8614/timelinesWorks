@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {Layout, Typography, Spin, Modal, Button, Space, message, Table} from 'antd';
-import { PlusOutlined, FolderAddOutlined } from '@ant-design/icons';
+import {PlusOutlined, FolderAddOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
 import ProjectTree from '../components/ProjectNavigator/ProjectTree';
 import { dataService } from '../services/dataService';
 import ProjectForm from "../components/Forms/ProjectForm";
@@ -20,6 +20,7 @@ const ProjectNavigatorPage = () => {
     const navigate = useNavigate();
     const [serverProjects, setServerProjects] = useState([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
+    const [deletingId, setDeletingId] = useState(null);
 
     const loadStructureTree = () => {
         setLoading(true);
@@ -82,6 +83,26 @@ const ProjectNavigatorPage = () => {
                 console.error('Error creating folder:', error);
                 message.error('Ошибка создания папки');
             });
+    };
+
+    const startDelete = (projectId) => {
+        setDeletingId(projectId);
+    };
+
+    const handleConfirmDelete = async (project) => {
+        try {
+            await serverProjectsApi.delete(project.id);
+            message.success('Проект удалён');
+            setDeletingId(null);
+            loadServerProjects();
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            message.error('Ошибка удаления проекта');
+        }
+    };
+
+    const handleCancelDelete = () => {
+        setDeletingId(null);
     };
 
     const handleDeleteItem = (itemKey) => {
@@ -215,23 +236,50 @@ const ProjectNavigatorPage = () => {
                             {
                                 title: 'Действия',
                                 key: 'actions',
-                                render: (_, record) => (
-                                    <Space>
-                                        <Button
-                                            type="link"
-                                            onClick={() => handleSelectProject(record.id)}
-                                        >
-                                            Открыть
-                                        </Button>
-                                        <Button
-                                            type="link"
-                                            danger
-                                            onClick={() => handleDeleteServerProject(record.id)}
-                                        >
-                                            Удалить
-                                        </Button>
-                                    </Space>
-                                )
+                                width: 240,
+                                render: (_, record) => {
+                                    if (deletingId === record.id) {
+                                        return (
+                                            <Space size="small">
+                                                <Button
+                                                    size="small"
+                                                    type="primary"
+                                                    danger
+                                                    icon={<CheckOutlined />}
+                                                    onClick={() => handleConfirmDelete(record)}
+                                                >
+                                                    Да
+                                                </Button>
+
+                                                <Button
+                                                    size="small"
+                                                    icon={<CloseOutlined />}
+                                                    onClick={handleCancelDelete}
+                                                >
+                                                    Нет
+                                                </Button>
+                                            </Space>
+                                        );
+                                    }
+
+                                    return (
+                                        <Space size="small">
+                                            <Button
+                                                type="link"
+                                                onClick={() => handleSelectProject(record.id)}
+                                            >
+                                                Открыть
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                danger
+                                                onClick={() => startDelete(record.id)}
+                                            >
+                                                Удалить
+                                            </Button>
+                                        </Space>
+                                    );
+                                }
                             }
                         ]}
                     />

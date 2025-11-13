@@ -56,17 +56,17 @@ const ProjectWorkspacePage = () => {
                 message.error('Ошибка загрузки проекта');
                 setLoading(false);
             });
-        // serverProjectsApi.getById(projectId)
-        //     .then(data => {
-        //         setProject(data);
-        //         setLoading(false);
-        //         setHasUnsavedChanges(false);
-        //     })
-        //     .catch(error => {
-        //         console.error('Error loading project from server:', error);
-        //         message.error('Ошибка загрузки проекта с сервера');
-        //         setLoading(false);
-        //     });
+        serverProjectsApi.getById(projectId)
+            .then(data => {
+                setProject(data);
+                setLoading(false);
+                setHasUnsavedChanges(false);
+            })
+            .catch(error => {
+                console.error('Error loading project from server:', error);
+                message.error('Ошибка загрузки проекта с сервера');
+                setLoading(false);
+            });
     };
 
     useEffect(() => {
