@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, Typography, Spin, Modal, Button, Space, message } from 'antd';
+import {Layout, Typography, Spin, Modal, Button, Space, message, Table} from 'antd';
 import { PlusOutlined, FolderAddOutlined } from '@ant-design/icons';
 import ProjectTree from '../components/ProjectNavigator/ProjectTree';
 import { dataService } from '../services/dataService';
 import ProjectForm from "../components/Forms/ProjectForm";
 import FolderForm from "../components/Forms/FolderForm";
+import {serverProjectsApi} from "../services/apiService";
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -17,6 +18,8 @@ const ProjectNavigatorPage = () => {
     const [isFolderModalVisible, setIsFolderModalVisible] = useState(false);
     const [selectedParentKey, setSelectedParentKey] = useState(null);
     const navigate = useNavigate();
+    const [serverProjects, setServerProjects] = useState([]);
+    const [loadingProjects, setLoadingProjects] = useState(true);
 
     const loadStructureTree = () => {
         setLoading(true);
@@ -32,26 +35,39 @@ const ProjectNavigatorPage = () => {
             });
     };
 
+    const loadServerProjects = () => {
+        setLoadingProjects(true);
+        serverProjectsApi.getAll()
+            .then(data => {
+                setServerProjects(data);
+                setLoadingProjects(false);
+            })
+            .catch(error => {
+                console.error('Error loading server projects:', error);
+                message.error('Ошибка загрузки проектов с сервера');
+                setLoadingProjects(false);
+            });
+    };
+
     useEffect(() => {
         loadStructureTree();
+        loadServerProjects();
     }, []);
 
     const handleSelectProject = (projectId) => {
         navigate(`/project/${projectId}`);
     };
 
-    const handleCreateProject = (projectData) => {
-        dataService.addProjectToTree(projectData, selectedParentKey)
-            .then(() => {
-                message.success('Проект создан успешно');
-                setIsProjectModalVisible(false);
-                setSelectedParentKey(null);
-                loadStructureTree();
-            })
-            .catch(error => {
-                console.error('Error creating project:', error);
-                message.error('Ошибка создания проекта');
-            });
+    const handleCreateProject = async () => {
+        try {
+            const created = await serverProjectsApi.createEmpty('Новый проект');
+            message.success('Проект создан на сервере');
+            await loadServerProjects();
+            navigate(`/project/${created.id}`);
+        } catch (error) {
+            console.error('Error creating project:', error);
+            message.error('Ошибка создания проекта на сервере');
+        }
     };
 
     const handleCreateFolder = (folderData) => {
@@ -89,6 +105,27 @@ const ProjectNavigatorPage = () => {
         });
     };
 
+    const handleDeleteServerProject = (projectId) => {
+        Modal.confirm({
+            title: 'Удалить проект?',
+            content: 'Проект будет удалён на сервере без возможности восстановления.',
+            okText: 'Удалить',
+            cancelText: 'Отмена',
+            okButtonProps: { danger: true },
+            onOk: async () => {
+                try {
+                    await serverProjectsApi.delete(projectId);
+                    message.success('Проект удалён');
+                    loadServerProjects();
+                } catch (error) {
+                    console.error('Error deleting project:', error);
+                    message.error('Ошибка удаления проекта');
+                }
+            }
+        });
+    };
+
+
     if (loading) {
         return (
             <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -98,7 +135,7 @@ const ProjectNavigatorPage = () => {
     }
 
     return (
-        <Layout style={{ minHeight: '100vh' }}>
+        <>
             <Header style={{ background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
                 <Title level={3} style={{ margin: '16px 0' }}>
                     Техническое Обслуживание
@@ -122,10 +159,7 @@ const ProjectNavigatorPage = () => {
                             <Button
                                 type="primary"
                                 icon={<PlusOutlined />}
-                                onClick={() => {
-                                    setSelectedParentKey(null);
-                                    setIsProjectModalVisible(true);
-                                }}
+                                onClick={handleCreateProject}
                             >
                                 Создать проект
                             </Button>
@@ -166,7 +200,44 @@ const ProjectNavigatorPage = () => {
             >
                 <ProjectForm onSubmit={handleCreateProject} />
             </Modal>
-        </Layout>
+            <div style={{ padding: '24px', background: '#f0f2f5' }}>
+                <Title level={5}>Проекты на сервере</Title>
+                {loadingProjects ? (
+                    <Spin />
+                ) : (
+                    <Table
+                        rowKey="id"
+                        dataSource={serverProjects}
+                        pagination={false}
+                        columns={[
+                            { title: 'Название', dataIndex: 'name', key: 'name' },
+                            { title: 'Описание', dataIndex: 'description', key: 'description' },
+                            {
+                                title: 'Действия',
+                                key: 'actions',
+                                render: (_, record) => (
+                                    <Space>
+                                        <Button
+                                            type="link"
+                                            onClick={() => handleSelectProject(record.id)}
+                                        >
+                                            Открыть
+                                        </Button>
+                                        <Button
+                                            type="link"
+                                            danger
+                                            onClick={() => handleDeleteServerProject(record.id)}
+                                        >
+                                            Удалить
+                                        </Button>
+                                    </Space>
+                                )
+                            }
+                        ]}
+                    />
+                )}
+            </div>
+        </>
     );
 };
 

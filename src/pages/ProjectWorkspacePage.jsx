@@ -26,6 +26,7 @@ import {
     MaintenanceTypesTable,
     UnitsTable
 } from '../components/Tables/index'
+import {serverProjectsApi} from "../services/apiService";
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -55,40 +56,49 @@ const ProjectWorkspacePage = () => {
                 message.error('Ошибка загрузки проекта');
                 setLoading(false);
             });
+        // serverProjectsApi.getById(projectId)
+        //     .then(data => {
+        //         setProject(data);
+        //         setLoading(false);
+        //         setHasUnsavedChanges(false);
+        //     })
+        //     .catch(error => {
+        //         console.error('Error loading project from server:', error);
+        //         message.error('Ошибка загрузки проекта с сервера');
+        //         setLoading(false);
+        //     });
     };
 
     useEffect(() => {
         loadProject();
     }, [projectId]);
 
-    const saveProject = () => {
-        dataService.saveProject(projectId, project)
-            .then(() => {
-                message.success('Проект сохранен');
-                setHasUnsavedChanges(false);
-            })
-            .catch(error => {
-                console.error('Error saving project:', error);
-                message.error('Ошибка сохранения проекта');
-            });
-    };
+    // const saveProject = () => {
+    //     dataService.saveProject(projectId, project)
+    //         .then(() => {
+    //             message.success('Проект сохранен');
+    //             setHasUnsavedChanges(false);
+    //         })
+    //         .catch(error => {
+    //             console.error('Error saving project:', error);
+    //             message.error('Ошибка сохранения проекта');
+    //         });
+    // };
 
-    const sendToServer = () => {
-        message.info('Отправка на сервер...');
+    const saveProject = async () => {
+        try {
+            const saved = await serverProjectsApi.save(project);
 
-        // Пример POST запроса:
-        // fetch('/api/projects/optimize', {
-        //     method: 'POST',
-        //     headers: { 'Content-Type': 'application/json' },
-        //     body: JSON.stringify(project)
-        // })
-        // .then(response => response.json())
-        // .then(data => {
-        //     const updatedProject = { ...project, timeline: data.timeline };
-        //     setProject(updatedProject);
-        //     dataService.saveProject(projectId, updatedProject);
-        //     message.success('Таймлайны получены от сервера');
-        // });
+            // по желанию: синхронизируем в localStorage, если у тебя там ещё что-то хранится
+            // dataService.saveProject(projectId, saved).catch(() => {});
+
+            setProject(saved);
+            setHasUnsavedChanges(false);
+            message.success('Проект сохранен на сервере');
+        } catch (error) {
+            console.error('Error saving project:', error);
+            message.error('Ошибка сохранения проекта на сервере');
+        }
     };
 
     const updateProject = (updatedData) => {

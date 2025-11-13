@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, {useState, useMemo, useCallback, useEffect} from 'react';
 import { Card, DatePicker, Space, Typography, Form, Select, Button, message, InputNumber, Checkbox, Progress, Alert } from 'antd';
 import { LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import Timeline from 'react-timelines';
@@ -19,13 +19,13 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     const [assignmentForm] = Form.useForm();
     const [openTracks, setOpenTracks] = useState({});
     const [includeOperatingInterval, setIncludeOperatingInterval] = useState(false);
+    const [forceRenderKey, setForceRenderKey] = useState(0);
 
     // Flux генерация
     const {
         isGenerating,
         progress,
         error: fluxError,
-        timeline: fluxTimeline,
         generatePlan,
         cancelGeneration,
         clearError
@@ -33,8 +33,20 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
 
     const timeline = project?.timeline || {};
 
-    const projectStart = project?.start;
-    const projectEnd = project?.end;
+    console.log(
+        '🔄 TimelineTab render',
+        {
+            forceRenderKey,
+            assemblyStates: timeline.assemblyStates?.length || 0,
+            unitAssignments: timeline.unitAssignments?.length || 0,
+            maintenanceEvents: timeline.maintenanceEvents?.length || 0,
+            timelineStart: timeline.start,
+            timelineEnd: timeline.end,
+        }
+    );
+
+    const projectStart = timeline?.start || project?.start;
+    const projectEnd = timeline?.end || project?.end;
 
     const currentYear = dayjs().year();
     const defaultStart = dayjs().year(currentYear).startOf('year');
@@ -59,15 +71,6 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     const timelineEndKey = timelineEndDayjs.format(DATE_FORMAT);
     const timelineStartDate = timelineStartDayjs.startOf('day').toDate();
     const timelineEndDate = timelineEndDayjs.endOf('day').toDate();
-
-    // Обработка обновлений таймлайна из Flux
-    React.useEffect(() => {
-        if (!fluxTimeline || !onProjectUpdate) return;
-        console.log('📝 Применяем полученный от Flux таймлайн в проект');
-        onProjectUpdate({ ...project, timeline: fluxTimeline });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fluxTimeline, onProjectUpdate, project]);
-
 
     // Обработка ошибок Flux
     React.useEffect(() => {
@@ -232,6 +235,17 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
 
     // НОВАЯ ЛОГИКА: Строим треки только из данных timeline
     const tracks = useMemo(() => {
+
+        console.log(
+            '🧩 build tracks',
+            {
+                assemblyStates: timeline.assemblyStates?.length || 0,
+                unitAssignments: timeline.unitAssignments?.length || 0,
+                maintenanceEvents: timeline.maintenanceEvents?.length || 0
+            }
+        );
+
+
         if (!project || !project.nodes || project.nodes.length === 0) {
             return [];
         }
@@ -632,62 +646,101 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
     /**
      * Обработчик генерации плана через Flux
      */
+// TimelineTab.jsx
+
+    // const handleGeneratePlan = useCallback(async () => {
+    //     console.log('🎯 handleGeneratePlan вызван');
+    //     console.log('📦 project:', project);
+    //
+    //     if (!project) {
+    //         console.error('❌ Проект не загружен');
+    //         message.error('Проект не загружен');
+    //         return;
+    //     }
+    //
+    //     if (!project.start || !project.end) {
+    //         console.error('❌ У проекта отсутствуют даты');
+    //         message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
+    //         return;
+    //     }
+    //
+    //     console.log('⏱️ [BEFORE FLUX] project.timeline:', project.timeline);
+    //     try {
+    //         await generatePlan(project, (generatedTimeline) => {
+    //             console.log('🎉 План ТО успешно сгенерирован (callback from hook)');
+    //             // 🟢 НОВЫЙ ТАЙМЛАЙН ИЗ FLUX
+    //             console.log('⏱️ [FROM FLUX] generatedTimeline:', generatedTimeline);
+    //             message.success('План ТО успешно сгенерирован');
+    //         });
+    //     } catch (error) {
+    //         console.error('❌ Error generating plan:', error);
+    //         message.error('Ошибка при генерации плана ТО');
+    //     }
+    // }, [project, generatePlan]);
+
     const handleGeneratePlan = useCallback(async () => {
-        console.log('🎯 handleGeneratePlan вызван');
-        console.log('📦 project:', project);
+            console.log('🎯 handleGeneratePlan вызван');
+            console.log('📦 project:', project);
 
-        if (!project) {
-            console.error('❌ Проект не загружен');
-            message.error('Проект не загружен');
-            return;
-        }
+            if (!project) {
+                console.error('❌ Проект не загружен');
+                message.error('Проект не загружен');
+                return;
+            }
 
-        // Проверяем наличие дат в проекте
-        if (!project.start || !project.end) {
-            console.error('❌ У проекта отсутствуют даты');
-            message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
-            return;
-        }
+            if (!project.start || !project.end) {
+                console.error('❌ У проекта отсутствуют даты');
+                message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
+                return;
+            }
 
-        console.log('✅ Проект загружен, вызываем generatePlan...');
+            console.log('⏱️ [BEFORE FLUX] project.timeline:', project.timeline);
 
-        try {
-            await generatePlan(project, (generatedTimeline) => {
-                console.log('🎉 План ТО успешно сгенерирован:', generatedTimeline);
-                message.success('План ТО успешно сгенерирован');
-            });
-        } catch (error) {
-            console.error('❌ Error generating plan:', error);
-            message.error('Ошибка при генерации плана ТО');
-        }
-    }, [project, generatePlan]);
+            try {
+                await generatePlan(project, async (generatedTimeline) => {
+                    console.log('🎉 План ТО успешно сгенерирован (callback from hook)');
+                    console.log('⏱️ [FROM FLUX] generatedTimeline:', generatedTimeline);
+
+                    // 🔥 КЛАДЁМ НОВЫЙ ТАЙМЛАЙН В ПРОЕКТ
+                    const updatedProject = {
+                        ...project,
+                        timeline: generatedTimeline,
+                    };
+
+                    // обновляем стейт проекта в родителе
+                    onProjectUpdate(updatedProject);
+
+                    // и сразу сохраняем демо-проект в localStorage
+                    try {
+                        await dataService.saveProject(project.id, updatedProject);
+                        console.log('💾 Проект с новым таймлайном сохранён в localStorage');
+                    } catch (e) {
+                        console.warn('⚠️ Не удалось сохранить проект с новым таймлайном:', e);
+                    }
+
+                    message.success('План ТО успешно сгенерирован');
+                });
+            } catch (error) {
+                console.error('❌ Error generating plan:', error);
+                message.error('Ошибка при генерации плана ТО');
+            }
+        }, [project, generatePlan, onProjectUpdate]);
+
 
     const hasAssemblies = assemblyOptions.length > 0;
     const hasUnits = unitOptions.some(option => option.componentTypeId);
     const assignmentDisabled = !hasAssemblies;
     const showUnitsHint = hasAssemblies && !hasUnits;
 
-    const hasTimelineData = tracks.length > 0;
+    const hasTimelineData =
+        tracks.length > 0 ||
+        (timeline.assemblyStates && timeline.assemblyStates.length > 0) ||
+        (timeline.unitAssignments && timeline.unitAssignments.length > 0) ||
+        (timeline.maintenanceEvents && timeline.maintenanceEvents.length > 0);
 
     const scaleEnd = timelineEndDate <= timelineStartDate
         ? dayjs(timelineStartDate).add(1, 'day').toDate()
         : timelineEndDate;
-
-    React.useEffect(() => {
-        // Перерисовываем данные после финиша: забираем свежий проект из localStorage
-        if (!project?.id || !onProjectUpdate) return;
-
-        // Перезапускать именно когда генерация закончилась и у нас что-то прилетело
-        if (isGenerating === false && fluxTimeline) {
-            dataService.getProject(project.id)
-                .then((fresh) => {
-                    console.log('♻️ Перезагружаем проект из localStorage после complete', fresh);
-                    onProjectUpdate(fresh);
-                })
-                .catch((e) => console.warn('Не удалось перечитать проект из localStorage:', e));
-        }
-    }, [isGenerating, fluxTimeline, project?.id]);
-
 
     return (
         <div className="timeline-tab">
@@ -967,10 +1020,40 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
 
 
             {/* График таймлайна */}
-            <Card className="timeline-chart">
+            {/*<Card className="timeline-chart">*/}
+            {/*    {hasTimelineData ? (*/}
+            {/*        <div className="timeline-wrapper">*/}
+            {/*            <Timeline*/}
+            {/*                key={forceRenderKey}*/}
+            {/*                scale={{*/}
+            {/*                    start: timelineStartDate,*/}
+            {/*                    end: scaleEnd,*/}
+            {/*                    zoom: zoom,*/}
+            {/*                }}*/}
+            {/*                zoomIn={zoomIn}*/}
+            {/*                zoomOut={zoomOut}*/}
+            {/*                clickElement={clickElement}*/}
+            {/*                timebar={timebar}*/}
+            {/*                tracks={tracks}*/}
+            {/*                now={now}*/}
+            {/*                enableSticky*/}
+            {/*                scrollToNow*/}
+            {/*                customElementRenderer={customElementRenderer}*/}
+            {/*            />*/}
+            {/*        </div>*/}
+            {/*    ) : (*/}
+            {/*        <div className="timeline-empty-state">*/}
+            {/*            <Typography.Text type="secondary">*/}
+            {/*                Нет данных для отображения таймлайна*/}
+            {/*            </Typography.Text>*/}
+            {/*        </div>*/}
+            {/*    )}*/}
+            {/*</Card>*/}
+            <Card className="timeline-chart" key={`timeline-card-${forceRenderKey}`}>
                 {hasTimelineData ? (
                     <div className="timeline-wrapper">
                         <Timeline
+                            key={`timeline-${forceRenderKey}`}
                             scale={{
                                 start: timelineStartDate,
                                 end: scaleEnd,
@@ -995,6 +1078,7 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                     </div>
                 )}
             </Card>
+
         </div>
     );
 };
