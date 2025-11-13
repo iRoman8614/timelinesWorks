@@ -9,6 +9,7 @@ const NodeForm = ({ onSubmit, initialValues }) => {
             id: initialValues?.id || crypto.randomUUID(),
             name: values.name,
             description: values.description,
+            type: 'NODE',
             children: [],
             conditions: []
         };
