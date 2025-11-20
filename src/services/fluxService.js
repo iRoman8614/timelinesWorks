@@ -37,11 +37,6 @@ class FluxService {
         let lastTimeline = null;
 
         try {
-            console.log('🔌 Подключение к Flux через POST SSE');
-            console.log('🔗 URL:', url);
-            console.log('📅 Период: с', startDate, 'по', endDate);
-            console.log('📦 Body:', project);
-
             await fetchEventSource(url, {
                     method: 'POST',
                     headers: {
@@ -51,13 +46,13 @@ class FluxService {
                     signal: this.abortController.signal,
 
                 onopen(response) {
-                    console.log('✅ Соединение открыто, статус:', response.status);
+                    console.log('Соединение открыто, статус:', response.status);
                     if (response.ok) return;
                     throw new Error(`HTTP error! status: ${response.status}`);
                 },
 
                 async onmessage(event) {
-                    console.log('📨 Получено SSE событие:', event);
+                    console.log('Получено SSE событие:', event);
 
                     const normalizeAsTimeline = (obj) => {
                         if (!obj || typeof obj !== 'object') return null;
@@ -108,8 +103,8 @@ class FluxService {
                             }
                         }
                         const eventType = event.event || payload?.event;
-                        console.log('📌 eventType:', eventType);
-                        console.log('📦 payload:', payload);
+                        console.log('eventType:', eventType);
+                        console.log('payload:', payload);
 
                         if (eventType === 'progress') {
                             const msg =
@@ -125,9 +120,9 @@ class FluxService {
                             const tl = normalizeAsTimeline(payload);
                             if (tl) {
                                 lastTimeline = tl;
-                                onTimelineUpdate(tl); // 🔥 сюда прилетает твой таймлайн
+                                onTimelineUpdate(tl);
                             } else {
-                                console.warn('⚠️ optimization-update без валидного таймлайна', payload);
+                                console.warn('optimization-update без валидного таймлайна', payload);
                             }
                             return;
                         }
@@ -156,19 +151,19 @@ class FluxService {
                         );
                     }
                     catch (error) {
-                        console.error('❌ Ошибка обработки события:', error);
+                        console.error('Ошибка обработки события:', error);
                         onError(error);
                     }
                 },
 
                 onerror(err) {
-                    console.error('❌ SSE error:', err);
+                    console.error('SSE error:', err);
                     onError(err);
                     throw err;
                 },
 
                 onclose() {
-                    console.log('🔌 Соединение закрыто');
+                    console.log('Соединение закрыто');
                     // если сервер закрыл поток без "complete", но у нас был валидный таймлайн — считаем это завершением
                     if (lastTimeline) {
                         try { onComplete(lastTimeline); } catch {}
@@ -178,7 +173,7 @@ class FluxService {
 
         } catch (error) {
             if (error.name !== 'AbortError') {
-                console.error('❌ Error in connectToFlux:', error);
+                console.error('Error in connectToFlux:', error);
                 onError(error);
             }
         }
@@ -205,9 +200,9 @@ class FluxService {
                 endDate = `${endDate}T00:00:00`;
             }
 
-            console.log('📤 Запуск генерации плана через Flux POST SSE');
-            console.log('📦 Проект:', project);
-            console.log('📅 Даты: start =', startDate, ', end =', endDate);
+            console.log('Запуск генерации плана через Flux POST SSE');
+            console.log('Проект:', project);
+            console.log('Даты: start =', startDate, ', end =', endDate);
 
             // Проверяем наличие дат
             if (!project.start || !project.end) {
@@ -218,7 +213,7 @@ class FluxService {
             await this.connectToFlux(projectId, startDate, endDate, project, callbacks);
 
         } catch (error) {
-            console.error('❌ Error in generatePlanWithFlux:', error);
+            console.error('Error in generatePlanWithFlux:', error);
             if (callbacks.onError) {
                 callbacks.onError(error);
             }
@@ -231,7 +226,6 @@ class FluxService {
      */
     disconnect() {
         if (this.abortController) {
-            console.log('🔌 Отключение от Flux (abort)');
             this.abortController.abort();
             this.abortController = null;
         }

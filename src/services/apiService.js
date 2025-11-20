@@ -21,7 +21,7 @@ export const serverProjectsApi = {
     async getAll() {
         const res = await fetch(API_BASE, { method: 'GET' });
         if (!res.ok) throw new Error('Failed to load projects');
-        return res.json(); // [{id,name,description,structure}, ...]
+        return res.json();
     },
 
     async getById(id) {

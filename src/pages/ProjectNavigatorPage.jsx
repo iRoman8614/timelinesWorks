@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {Layout, Typography, Spin, Modal, Button, Space, message, Table} from 'antd';
-import {PlusOutlined, FolderAddOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
+import {PlusOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
 import ProjectTree from '../components/ProjectNavigator/ProjectTree';
 import { dataService } from '../services/dataService';
 import ProjectForm from "../components/Forms/ProjectForm";
-import FolderForm from "../components/Forms/FolderForm";
 import {serverProjectsApi} from "../services/apiService";
 
 const { Header, Content } = Layout;

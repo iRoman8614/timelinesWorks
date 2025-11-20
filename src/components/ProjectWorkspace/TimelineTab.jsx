@@ -96,12 +96,11 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
 
         if (
             element?.meta &&
-            (element.meta.kind === 'unitAssignment' ||
-                element.meta.kind === 'maintenanceEvent')
+            ['unitAssignment', 'maintenanceEvent', 'assemblyState'].includes(element.meta.kind)
         ) {
             setSelectedElement(element);
         }
-    }, [setSelectedElement]);
+    }, []);
 
     //
     // const toggleTrackOpen = useCallback((trackId) => {
@@ -391,7 +390,12 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                             border: 'none',
                             borderRadius: '4px',
                             opacity: 0.3
-                        }
+                        },
+                        meta: {
+                            kind: 'assemblyState',
+                            state,
+                            assembly,
+                        },
                     });
                 });
             }
@@ -857,6 +861,34 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
             );
         }
 
+        if (meta.kind === 'assemblyState' && meta.state) {
+            const { state, assembly } = meta;
+
+            const stateNames = {
+                WORKING: 'Работает',
+                IDLE: 'Простой',
+                SHUTTING_DOWN: 'Останов',
+                STARTING_UP: 'Запуск',
+            };
+
+            return (
+                <Descriptions column={1} size="small" bordered>
+                    <Descriptions.Item label="Тип">
+                        Состояние агрегата
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Агрегат">
+                        {assembly?.name || state.assemblyId}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Состояние">
+                        {stateNames[state.type] || state.type}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Дата и время">
+                        {dayjs(state.dateTime).format('YYYY-MM-DD HH:mm')}
+                    </Descriptions.Item>
+                </Descriptions>
+            );
+        }
+
         return null;
     };
 
@@ -883,6 +915,14 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                     updatedTimeline = {
                         ...updatedTimeline,
                         maintenanceEvents: prev.filter((e) => e !== meta.event),
+                    };
+                }
+
+                if (meta.kind === 'assemblyState' && meta.state) {
+                    const prev = updatedTimeline.assemblyStates || [];
+                    updatedTimeline = {
+                        ...updatedTimeline,
+                        assemblyStates: prev.filter((s) => s !== meta.state),
                     };
                 }
 
@@ -1185,37 +1225,6 @@ const TimelineTab = ({ project, onProjectUpdate, apiBaseUrl = '/api' }) => {
                 </Space>
             </Card>
 
-
-            {/* График таймлайна */}
-            {/*<Card className="timeline-chart">*/}
-            {/*    {hasTimelineData ? (*/}
-            {/*        <div className="timeline-wrapper">*/}
-            {/*            <Timeline*/}
-            {/*                key={forceRenderKey}*/}
-            {/*                scale={{*/}
-            {/*                    start: timelineStartDate,*/}
-            {/*                    end: scaleEnd,*/}
-            {/*                    zoom: zoom,*/}
-            {/*                }}*/}
-            {/*                zoomIn={zoomIn}*/}
-            {/*                zoomOut={zoomOut}*/}
-            {/*                clickElement={clickElement}*/}
-            {/*                timebar={timebar}*/}
-            {/*                tracks={tracks}*/}
-            {/*                now={now}*/}
-            {/*                enableSticky*/}
-            {/*                scrollToNow*/}
-            {/*                customElementRenderer={customElementRenderer}*/}
-            {/*            />*/}
-            {/*        </div>*/}
-            {/*    ) : (*/}
-            {/*        <div className="timeline-empty-state">*/}
-            {/*            <Typography.Text type="secondary">*/}
-            {/*                Нет данных для отображения таймлайна*/}
-            {/*            </Typography.Text>*/}
-            {/*        </div>*/}
-            {/*    )}*/}
-            {/*</Card>*/}
             <Card className="timeline-chart" key={`timeline-card-${forceRenderKey}`}>
                 {hasTimelineData ? (
                     <div className="timeline-wrapper">

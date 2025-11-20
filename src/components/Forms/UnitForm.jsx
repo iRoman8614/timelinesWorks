@@ -9,7 +9,7 @@ const UnitForm = ({ onSubmit, initialValues, partModels = [] }) => {
             id: initialValues?.id || crypto.randomUUID(),
             name: values.name,
             description: values.description || '',
-            partModelId: values.partModelId, // Изменено с partModel на partModelId
+            partModelId: values.partModelId,
             serialNumber: values.serialNumber,
             manufactureDate: values.manufactureDate || null
         };

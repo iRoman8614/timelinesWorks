@@ -28,7 +28,6 @@ const ProjectTree = ({ data, onSelectProject }) => {
     const treeData = convertToTreeData(data.rootItems);
 
     const handleSelect = (selectedKeys, info) => {
-        // Вызываем callback только если выбран проект (не папка)
         if (info.node.type === 'project') {
             onSelectProject(info.node.key);
         }

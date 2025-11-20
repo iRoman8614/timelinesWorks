@@ -88,10 +88,6 @@ const ProjectWorkspacePage = () => {
     const saveProject = async () => {
         try {
             const saved = await serverProjectsApi.save(project);
-
-            // по желанию: синхронизируем в localStorage, если у тебя там ещё что-то хранится
-            // dataService.saveProject(projectId, saved).catch(() => {});
-
             setProject(saved);
             setHasUnsavedChanges(false);
             message.success('Проект сохранен на сервере');

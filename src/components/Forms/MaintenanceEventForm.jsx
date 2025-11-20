@@ -32,17 +32,14 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         return assemblies.find(a => a.id === assemblyId);
     };
 
-// Получить тип агрегата
     const getAssemblyType = (assemblyTypeId) => {
         return project.assemblyTypes.find(at => at.id === assemblyTypeId);
     };
 
-// Получить тип компонента
     const getComponentType = (componentTypeId) => {
         return project.componentTypes.find(ct => ct.id === componentTypeId);
     };
 
-// Получить компоненты выбранного агрегата
     const getAssemblyComponents = () => {
         if (!selectedAssembly) return [];
         const assembly = getAssemblyInfo(selectedAssembly);
@@ -52,7 +49,6 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         return assemblyType.components || [];
     };
 
-// Получить текущий назначенный Unit для компонента
     const getCurrentUnitForComponent = (assemblyId, componentId) => {
         const assignments = (project.timeline?.unitAssignments || [])
             .filter(ua =>
@@ -78,19 +74,16 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         const component = assemblyType.components.find(c => c.id === selectedComponent);
         if (!component) return;
 
-        // Получаем ComponentType для этого компонента
         const componentTypeId = component.componentTypeId;
         if (!componentTypeId) {
             setAvailableMaintenanceTypes([]);
             return;
         }
 
-        // Находим все PartModels этого типа и собираем их maintenanceTypes
         const allMaintenanceTypes = [];
         project.partModels?.forEach(pm => {
             if (pm.componentTypeId === componentTypeId && pm.maintenanceTypes) {
                 pm.maintenanceTypes.forEach(mt => {
-                    // Добавляем только уникальные (по id)
                     if (!allMaintenanceTypes.find(existing => existing.id === mt.id)) {
                         allMaintenanceTypes.push(mt);
                     }
@@ -130,46 +123,6 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
         if (!partModelWithUnits) return null;
         return partModelWithUnits.units[0].id;
     };
-
-
-    // const handleFinish = (values) => {
-    //     const assembly = getAssemblyInfo(values.assemblyId);
-    //     if (!assembly) {
-    //         message.error('Агрегат не найден');
-    //         return;
-    //     }
-    //
-    //     const assemblyType = getAssemblyType(assembly.assemblyTypeId);
-    //     console.log('assemblyType', assemblyType)
-    //     console.log('assembly', assembly)
-    //     const component = assemblyType?.components.find(c => c.id === values.componentId);
-    //     console.log('componentId', values.componentId)
-    //     console.log('component', component)
-    //     if (!component) {
-    //         message.error('Компонент не найден');
-    //         return;
-    //     }
-    //
-    //     // Создаём специальный unitId для работ без привязки к конкретному Unit
-    //     const virtualUnitId = `${values.componentId}`;
-    //
-    //     const eventData = {
-    //         maintenanceTypeId: values.maintenanceTypeId,
-    //         unitId: virtualUnitId,
-    //         componentOfAssembly: {
-    //             assemblyId: values.assemblyId,
-    //             componentPath: [values.componentId]
-    //         },
-    //         dateTime: values.dateTime.format('YYYY-MM-DDTHH:mm:ss'),
-    //         custom: true
-    //     };
-    //
-    //     onSubmit(eventData);
-    //     form.resetFields();
-    //     setSelectedAssembly(null);
-    //     setSelectedComponent(null);
-    //     message.success('Внеплановая работа добавлена');
-    // };
 
     const handleFinish = (values) => {
         const assembly = getAssemblyInfo(values.assemblyId);
@@ -261,7 +214,7 @@ const MaintenanceEventForm = ({ onSubmit, project }) => {
             {availableMaintenanceTypes.length === 0 && selectedComponent && (
                 <div style={{ padding: '12px', background: '#fff7e6', borderRadius: '4px', marginBottom: '16px', border: '1px solid #ffd591' }}>
                     <Text type="warning">
-                        ⚠️ Для выбранного типа компонента нет доступных типов работ.
+                        Для выбранного типа компонента нет доступных типов работ.
                         Создайте модель детали с типами ТО для этого типа компонента.
                     </Text>
                 </div>
