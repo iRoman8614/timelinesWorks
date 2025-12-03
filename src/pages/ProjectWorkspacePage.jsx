@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {Layout, Typography, Button, Spin, Tabs, message, Modal, Space, Collapse, Table} from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined } from '@ant-design/icons';
-import { dataService } from '../services/dataService';
 import TimelineTab from '../components/ProjectWorkspace/TimelineTab';
 import InstructionBlock from '../components/ProjectWorkspace/InstructionBlock';
 import './ProjectWorkspace.css';
@@ -15,7 +14,9 @@ import {
     PartModelForm,
     MaintenanceTypeForm,
     UnitForm,
-    NodeConditionForm
+    NodeConditionForm,
+    AssignUnitForm,
+    AddUnplannedMaintenanceForm
 } from '../components/Forms/index'
 import {
     NodesTable,
@@ -45,17 +46,6 @@ const ProjectWorkspacePage = () => {
 
     const loadProject = () => {
         setLoading(true);
-        dataService.getProject(projectId)
-            .then(data => {
-                setProject(data);
-                setLoading(false);
-                setHasUnsavedChanges(false);
-            })
-            .catch(error => {
-                console.error('Error loading project:', error);
-                message.error('Ошибка загрузки проекта');
-                setLoading(false);
-            });
         serverProjectsApi.getById(projectId)
             .then(data => {
                 setProject(data);
@@ -388,6 +378,38 @@ const ProjectWorkspacePage = () => {
         setActiveModal('selectChildType');
     };
 
+    const handleAssignUnit = (unitAssignment) => {
+        const updated = {
+            ...project,
+            timeline: {
+                ...project.timeline,
+                unitAssignments: [
+                    ...(project.timeline?.unitAssignments || []),
+                    unitAssignment
+                ]
+            }
+        };
+        updateProject(updated);
+        setActiveModal(null);
+        message.success('Деталь назначена компоненту');
+    };
+
+    const handleAddUnplannedMaintenance = (maintenanceEvent) => {
+        const updated = {
+            ...project,
+            timeline: {
+                ...project.timeline,
+                maintenanceEvents: [
+                    ...(project.timeline?.maintenanceEvents || []),
+                    maintenanceEvent
+                ]
+            }
+        };
+        updateProject(updated);
+        setActiveModal(null);
+        message.success('Внеплановая работа добавлена');
+    };
+
     if (loading) {
         return (
             <Layout style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -414,9 +436,11 @@ const ProjectWorkspacePage = () => {
             children: <TimelineTab
                 project={project}
                 onProjectUpdate={updateProject}
+                onOpenAssignUnit={() => setActiveModal('assignUnit')}
+                onOpenAddMaintenance={() => setActiveModal('addUnplannedMaintenance')}
             />
 
-                //<TimelineTab project={project} onUpdateProject={updateProject} />
+            //<TimelineTab project={project} onUpdateProject={updateProject} />
         },
         {
             key: 'configurator',
@@ -693,13 +717,6 @@ const ProjectWorkspacePage = () => {
                         >
                             Сохранить
                         </Button>
-                        {/*<Button*/}
-                        {/*    type="primary"*/}
-                        {/*    icon={<SendOutlined />}*/}
-                        {/*    onClick={sendToServer}*/}
-                        {/*>*/}
-                        {/*    Отправить на сервер*/}
-                        {/*</Button>*/}
                     </Space>
                 </div>
             </Header>
@@ -1050,6 +1067,32 @@ const ProjectWorkspacePage = () => {
                         )}
                     </div>
                 </Space>
+            </Modal>
+
+            <Modal
+                title="Назначить деталь компоненту"
+                open={activeModal === 'assignUnit'}
+                onCancel={() => setActiveModal(null)}
+                footer={null}
+                width={600}
+            >
+                <AssignUnitForm
+                    project={project}
+                    onSubmit={handleAssignUnit}
+                />
+            </Modal>
+
+            <Modal
+                title="Добавить внеплановую работу ТО"
+                open={activeModal === 'addUnplannedMaintenance'}
+                onCancel={() => setActiveModal(null)}
+                footer={null}
+                width={600}
+            >
+                <AddUnplannedMaintenanceForm
+                    project={project}
+                    onSubmit={handleAddUnplannedMaintenance}
+                />
             </Modal>
         </Layout>
     );

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { fluxService } from '../services/fluxService';
-import { dataService } from '../services/dataService';
+import { serverProjectsApi } from '../services/apiService';
 
 export const useFluxTimelineGeneration = (baseUrl = '/api') => {
     const [isGenerating, setIsGenerating] = useState(false);
@@ -21,7 +21,7 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
         };
     }, []);
 
-    const generatePlan = useCallback(async (project, onComplete) => {
+    const generatePlan = useCallback(async (project, activePlan, onComplete) => {
         projectRef.current = project || null;
         projectIdRef.current = project?.id || null;
 
@@ -40,7 +40,7 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
         _setTimeline(null);
 
         try {
-            await fluxService.generatePlanWithFlux(project, {
+            await fluxService.generatePlanWithFlux(project, activePlan, {
                 onProgress: (message) => {
                     _setProgress(typeof message === 'string' ? message : 'Обработка...');
                 },
@@ -54,7 +54,7 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
                         const pid = projectIdRef.current;
                         const base = projectRef.current || {};
                         if (pid) {
-                            await dataService.saveProject(pid, {
+                            await serverProjectsApi.save({
                                 ...base,
                                 timeline: timelineData,
                             });
@@ -74,7 +74,7 @@ export const useFluxTimelineGeneration = (baseUrl = '/api') => {
                         const pid = projectIdRef.current;
                         const base = projectRef.current || {};
                         if (pid) {
-                            await dataService.saveProject(pid, {
+                            await serverProjectsApi.save({
                                 ...base,
                                 timeline: tl,
                             });

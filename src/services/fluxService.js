@@ -184,13 +184,13 @@ class FluxService {
     /**
      * Генерирует план через Flux с POST SSE
      */
-    async generatePlanWithFlux(project, callbacks = {}) {
+    async generatePlanWithFlux(project, activePlan, callbacks = {}) {
         try {
             const projectId = project.id;
 
             // Берём даты из проекта или используем дефолтные
-            let startDate = project.start || '2024-01-01';
-            let endDate = project.end || '2024-12-31';
+            let startDate = activePlan.startTime || '2024-01-01';
+            let endDate = activePlan.endTime || '2024-12-31';
 
             // Преобразуем в ISO формат с временем, если нужно
             if (!startDate.includes('T')) {
@@ -201,11 +201,11 @@ class FluxService {
             }
 
             console.log('Запуск генерации плана через Flux POST SSE');
-            console.log('Проект:', project);
+            console.log('activePlan:', activePlan);
             console.log('Даты: start =', startDate, ', end =', endDate);
 
             // Проверяем наличие дат
-            if (!project.start || !project.end) {
+            if (!activePlan.startTime || !activePlan.endTime) {
                 throw new Error('У проекта отсутствуют даты start или end');
             }
 

@@ -9,7 +9,7 @@ import './App.css';
 function App() {
   return (
       <ConfigProvider locale={ruRU}>
-        <BrowserRouter>
+        <BrowserRouter basename={'/optimizer/'}>
           <Routes>
             <Route path="/" element={<ProjectNavigatorPage />} />
             <Route path="/project/:projectId" element={<ProjectWorkspacePage />} />

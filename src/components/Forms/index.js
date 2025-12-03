@@ -9,6 +9,8 @@ import UnitForm from "./UnitForm";
 import NodeConditionForm from "./NodeConditionForm";
 import UnitAssignmentForm from "./UnitAssignmentForm";
 import MaintenanceEventForm from './MaintenanceEventForm';
+import AssignUnitForm from './AssignUnitForm';
+import AddUnplannedMaintenanceForm from './AddUnplannedMaintenanceForm';
 
 export {
     NodeForm,
@@ -21,5 +23,7 @@ export {
     UnitForm,
     NodeConditionForm,
     UnitAssignmentForm,
-    MaintenanceEventForm
+    MaintenanceEventForm,
+    AssignUnitForm,
+    AddUnplannedMaintenanceForm
 }

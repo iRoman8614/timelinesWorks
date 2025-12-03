@@ -12,7 +12,8 @@ module.exports = {
     },
 
     output: {
-        path: path.resolve(__dirname, 'dist'),
+        publicPath: '/optimizer/',
+        path: path.resolve(__dirname, 'build'),
         filename: '[name].js',
         chunkFilename: '[name].chunk.js',
     },
