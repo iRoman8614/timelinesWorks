@@ -1058,7 +1058,7 @@ const ProjectWorkspacePage = () => {
                                 <Typography.Text>
                                     {condition.type === 'MAX_MAINTENANCE'
                                         ? `Максимум на ТО: ${condition.maxUnderMaintenance}`
-                                        : `Минимум работающих: ${condition.requiredWorking}`}
+                                        : `Количество работающих агрегатов: ${condition.requiredWorking}`}
                                 </Typography.Text>
                             </div>
                         ))}

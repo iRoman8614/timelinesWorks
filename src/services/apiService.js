@@ -19,6 +19,7 @@ const serializeProject = (project) => ({
     id: project.id,
     name: project.name,
     description: project.description || '',
+    historyUpdatedAt: project.historyUpdatedAt || null,
     structure: JSON.stringify(project)
 });
 
@@ -209,12 +210,13 @@ const HISTORY_BASE = `${process.env.REACT_APP_API_BASE_URL}/api/history`;
 export const projectHistoryApi = {
     /**
      * Скачать шаблон Excel для внесения наработок
-     * GET /api/history/download-template?projectId={projectId}
+     * GET /api/history/download-template?projectId={projectId}&baseDate={baseDate}
      * @param {string} projectId - UUID проекта
+     * @param {string} baseDate - Базовая дата в формате YYYY-MM-DD
      * @returns {Promise<Blob>} - Excel файл
      */
-    async downloadTemplate(projectId) {
-        const res = await fetch(`${HISTORY_BASE}/download-template?projectId=${projectId}`, {
+    async downloadTemplate(projectId, baseDate) {
+        const res = await fetch(`${HISTORY_BASE}/download-template?projectId=${projectId}&baseDate=${baseDate}&calculateOperatingHours=true`, {
             headers: {
                 'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             }
@@ -246,5 +248,66 @@ export const projectHistoryApi = {
         }
 
         return res.json();
+    }
+};
+
+const REPORTS_BASE = `${process.env.REACT_APP_API_BASE_URL}/api/reports`;
+
+export const reportsApi = {
+    /**
+     * Генерация месячного отчета
+     * POST /api/reports/generate?reportType=MONTHLY&projectId={projectId}&planId={planId}&startDate={startDate}&endDate={endDate}
+     *
+     * @param {Object} params
+     * @param {string} params.projectId - UUID проекта
+     * @param {string|null} params.planId - UUID плана (null для исторического таймлайна)
+     * @param {string} params.startDate - Дата начала в формате YYYY-MM-DD
+     * @param {string} params.endDate - Дата окончания в формате YYYY-MM-DD
+     * @param {string[]} params.assemblies - Массив ID агрегатов
+     * @param {string[]} params.components - Массив ID типов компонентов
+     * @param {Object} params.maintenances - Объект {maintenanceId: hexColor}
+     * @returns {Promise<Blob>} - Excel файл
+     */
+    async generateMonthlyReport({ projectId, planId, startDate, endDate, assemblies, components, maintenances }) {
+        // Формируем query параметры
+        const queryParams = new URLSearchParams({
+            reportType: 'MONTHLY',
+            projectId: projectId,
+            startDate: startDate,
+            endDate: endDate
+        });
+
+        // Добавляем planId только если он есть (для плана)
+        if (planId) {
+            queryParams.append('planId', planId);
+        }
+
+        // Формируем тело запроса
+        const body = {
+            assemblies: assemblies,
+            components: components,
+            maintenances: maintenances
+        };
+
+        console.log('📊 Генерация отчета:', {
+            url: `${REPORTS_BASE}/generate?${queryParams.toString()}`,
+            body: body
+        });
+
+        const res = await fetch(`${REPORTS_BASE}/generate?${queryParams.toString()}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ message: 'Failed to generate report' }));
+            throw new Error(error.message || 'Failed to generate report');
+        }
+
+        return res.blob();
     }
 };

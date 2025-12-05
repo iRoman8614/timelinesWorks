@@ -6,13 +6,13 @@ const NodeConditionForm = ({ onSubmit, initialValues }) => {
     const [conditionType, setConditionType] = useState(initialValues?.type || null);
 
     const handleFinish = (values) => {
-        const conditionData = {
-            type: values.type
-        };
+        const conditionData = {};
 
         if (values.type === 'MAX_MAINTENANCE') {
+            conditionData.type = 'MAX_MAINTENANCE';
             conditionData.maxUnderMaintenance = values.value;
         } else if (values.type === 'REQUIRED_WORKING') {
+            conditionData.type = 'REQUIRED_WORKING';
             conditionData.requiredWorking = values.value;
         }
 
@@ -46,7 +46,7 @@ const NodeConditionForm = ({ onSubmit, initialValues }) => {
                         Максимум агрегатов на ТО
                     </Select.Option>
                     <Select.Option value="REQUIRED_WORKING">
-                        Минимум работающих агрегатов
+                        Число работающих агрегатов
                     </Select.Option>
                 </Select>
             </Form.Item>

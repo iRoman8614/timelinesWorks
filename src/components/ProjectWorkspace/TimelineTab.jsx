@@ -12,23 +12,20 @@ import {
     Descriptions,
     Input, Spin
 } from 'antd';
-import { LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import {LoadingOutlined, CloseCircleOutlined, FileExcelOutlined} from '@ant-design/icons';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import './TimelineTab.css';
 import { getContrastTextColor } from '../../utils/contrastTextColor';
 import { useFluxTimelineGeneration } from '../../hooks/useFluxTimelineGeneraion';
 import dayjs from 'dayjs';
-import { serverProjectsApi, plansApi, projectHistoryApi } from '../../services/apiService';
+import { serverProjectsApi, plansApi, projectHistoryApi, reportsApi } from '../../services/apiService';
 import { useSearchParams } from 'react-router-dom';
 import {
-    HistoryOutlined,
-    DeleteOutlined,
-    ToolOutlined,
-    BulbOutlined,
-    DashboardOutlined
+    HistoryOutlined
 } from '@ant-design/icons';
-import { Badge, Statistic, Divider } from 'antd';
+import MonthlyReportModal from './MonthlyReportModal';
+import DownloadTemplateModal from './DownloadTemplateModal';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const ASSIGNMENT_DATETIME_FORMAT = 'YYYY-MM-DDTHH:mm:ss';
@@ -41,11 +38,12 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     const [includeOperatingInterval, setIncludeOperatingInterval] = useState(false);
     const [forceRenderKey, setForceRenderKey] = useState(0);
     const [selectedElement, setSelectedElement] = useState(null);
+    const [isMonthlyReportModalVisible, setIsMonthlyReportModalVisible] = useState(false);
 
     const [planName, setPlanName] = useState('');
     const [isSavingPlan, setIsSavingPlan] = useState(false);
     const [planFormStartDate, setPlanFormStartDate] = useState(() =>
-        dayjs().startOf('year')
+        dayjs().endOf('month')
     );
     const [planFormEndDate, setPlanFormEndDate] = useState(() =>
         dayjs().endOf('year')
@@ -59,6 +57,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
     const fileInputRef = useRef(null);
     const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+    const [isDownloadTemplateModalVisible, setIsDownloadTemplateModalVisible] = useState(false);
     const [isUploadingHistory, setIsUploadingHistory] = useState(false);
 
     const [currentTimeline, setCurrentTimeline] = useState({});
@@ -105,14 +104,11 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
     // Сброс к историческому таймлайну проекта
     const resetToProjectTimeline = useCallback(() => {
-        console.log('🔙 Возврат к историческому таймлайну проекта');
         setActivePlan(null);
         setIsProjectTimeline(true);
         setSearchParams({});
         setForceRenderKey(k => k + 1);
     }, [setSearchParams]);
-
-
 
 
     // const timeline = project?.timeline || {};
@@ -424,6 +420,20 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             return;
         }
 
+        if (project.historyUpdatedAt) {
+            const historyDate = dayjs(project.historyUpdatedAt).startOf('day');
+            const planStartDate = planFormStartDate.startOf('day');
+
+            if (planStartDate.isBefore(historyDate)) {
+                message.error(
+                    `Новый план не может начинаться раньше даты последнего обновления истории (${historyDate.format('DD.MM.YYYY')}). ` +
+                    `Выберите дату начала ${historyDate.format('DD.MM.YYYY')} или позже.`
+                );
+                return;
+            }
+        }
+
+
         try {
             setIsSavingPlan(true);
 
@@ -432,15 +442,15 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                 name: planName.trim(),
                 description: `План создан ${dayjs().format('DD.MM.YYYY HH:mm')}`,
                 projectId: project.id,
-                start: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
-                end: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss'),
+                startTime: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
+                endTime: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss'),
                 timeline: JSON.stringify(project.timeline || {})
             };
 
             console.log('💾 Создание плана:', {
                 name: planName,
-                start: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
-                end: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss')
+                startTime: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
+                endTime: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss')
             });
 
             const newPlan = await plansApi.create(planData);
@@ -1103,6 +1113,8 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             console.log('💾 Обновление плана:', {
                 planId: activePlan.id,
                 planName: activePlan.name,
+                startTime: activePlan.startTime,     // ← добавить для отладки
+                endTime: activePlan.endTime,         // ← добавить для отладки
                 eventsCount: timelineToSave.maintenanceEvents?.length || 0,
                 hasFluxData: !!planTimelines[activePlan.id]
             });
@@ -1112,8 +1124,8 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                 name: activePlan.name,
                 description: activePlan.description,
                 projectId: activePlan.projectId,
-                start: activePlan.startTime,
-                end: activePlan.endTime,
+                startTime: activePlan.startTime,     // ✅ ПРАВИЛЬНО
+                endTime: activePlan.endTime,         // ✅ ПРАВИЛЬНО
                 timeline: JSON.stringify(timelineToSave)
             })
 
@@ -1425,7 +1437,22 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
 
     // Скачать шаблон Excel
-    const handleDownloadTemplate = useCallback(async () => {
+// Открыть модальное окно для выбора baseDate
+    const handleOpenDownloadTemplateModal = useCallback(() => {
+        if (!project || !project.id) {
+            message.error('Проект не загружен');
+            return;
+        }
+        setIsDownloadTemplateModalVisible(true);
+    }, [project]);
+
+// Закрыть модальное окно
+    const handleCloseDownloadTemplateModal = useCallback(() => {
+        setIsDownloadTemplateModalVisible(false);
+    }, []);
+
+// Скачать шаблон с выбранной baseDate
+    const handleDownloadTemplate = useCallback(async (baseDate) => {
         if (!project || !project.id) {
             message.error('Проект не загружен');
             return;
@@ -1433,65 +1460,33 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
         try {
             setIsDownloadingTemplate(true);
-            const blob = await projectHistoryApi.downloadTemplate(project.id);
+
+            console.log('📥 Скачивание шаблона с baseDate:', baseDate);
+
+            const blob = await projectHistoryApi.downloadTemplate(project.id, baseDate);
 
             // Создать ссылку для скачивания
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `template_${project.name || 'project'}_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+            a.download = `template_${project.name || 'project'}_${baseDate}.xlsx`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
             message.success('Шаблон скачан');
+
+            // Закрыть модальное окно после успешного скачивания
+            handleCloseDownloadTemplateModal();
         } catch (error) {
             console.error('Ошибка скачивания шаблона:', error);
             message.error('Не удалось скачать шаблон: ' + error.message);
         } finally {
             setIsDownloadingTemplate(false);
         }
-    }, [project]);
+    }, [project, handleCloseDownloadTemplateModal]);
 
-    // Загрузить файл истории
-    // const handleUploadHistory = useCallback(async (event) => {
-    //     const file = event.target.files?.[0];
-    //     if (!file) return;
-    //
-    //     if (!project || !project.id) {
-    //         message.error('Проект не загружен');
-    //         event.target.value = ''; // Очистить input
-    //         return;
-    //     }
-    //
-    //     try {
-    //         setIsUploadingHistory(true);
-    //         const result = await projectHistoryApi.loadHistory(project.id, file);
-    //
-    //         message.success('Файл истории загружен');
-    //
-    //         // Если API вернул обновленные данные timeline, применить их
-    //         if (result && result.timeline) {
-    //             const updatedProject = {
-    //                 ...project,
-    //                 timeline: result.timeline
-    //             };
-    //             onProjectUpdate(updatedProject);
-    //         } else {
-    //             // Если данных нет, просто перезагрузить проект
-    //             if (onProjectUpdate && typeof onProjectUpdate === 'function') {
-    //                 message.info('Обновите страницу для применения изменений');
-    //             }
-    //         }
-    //     } catch (error) {
-    //         console.error('Ошибка загрузки файла истории:', error);
-    //         message.error('Не удалось загрузить файл: ' + error.message);
-    //     } finally {
-    //         setIsUploadingHistory(false);
-    //         event.target.value = ''; // Очистить input для повторной загрузки
-    //     }
-    // }, [project, onProjectUpdate]);
 
     const handleUploadHistory = useCallback(async (event) => {
         const file = event.target.files?.[0];
@@ -1508,26 +1503,25 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             const result = await projectHistoryApi.loadHistory(project.id, file);
 
             message.success('Файл истории загружен');
+            console.log('🔄 Перезагрузка проекта после импорта истории');
+            try {
+                const refreshedProject = await serverProjectsApi.getById(project.id);
 
-            // ✅ ВАЖНО: Обновляется ТОЛЬКО project.timeline
-            if (result && result.timeline) {
-                const updatedProject = {
-                    ...project,
-                    timeline: result.timeline,
-                    historyUpdatedAt: result.historyUpdatedAt || new Date().toISOString()
-                };
+                onProjectUpdate(refreshedProject);
 
-                // ✅ Обновляем проект через onProjectUpdate
-                onProjectUpdate(updatedProject);
-
-                // ✅ Если сейчас показываем исторический таймлайн - обновим его
                 if (isProjectTimeline) {
                     setForceRenderKey(k => k + 1);
                 }
 
-                message.info('Исторический таймлайн проекта обновлен');
-            } else {
-                message.info('Обновите страницу для применения изменений');
+                message.info('Проект обновлен с новыми историческими данными');
+
+                if (refreshedProject.historyUpdatedAt) {
+                    const historyDate = dayjs(refreshedProject.historyUpdatedAt).format('DD.MM.YYYY');
+                    message.info(`Дата последней истории: ${historyDate}`);
+                }
+            } catch (err) {
+                console.error('Ошибка перезагрузки проекта:', err);
+                message.error('Не удалось обновить проект. Перезагрузите страницу.');
             }
         } catch (error) {
             console.error('Ошибка загрузки файла истории:', error);
@@ -1538,7 +1532,48 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
         }
     }, [project, onProjectUpdate, isProjectTimeline]);
 
+    const handleOpenMonthlyReportModal = useCallback(() => {
+        setIsMonthlyReportModalVisible(true);
+    }, []);
 
+    const handleCloseMonthlyReportModal = useCallback(() => {
+        setIsMonthlyReportModalVisible(false);
+    }, []);
+
+    const handleGenerateMonthlyReport = useCallback(async ({ startDate, endDate, assemblies, components, maintenances }) => {
+        if (!project?.id) {
+            message.error('Проект не загружен');
+            return;
+        }
+
+        try {
+            const blob = await reportsApi.generateMonthlyReport({
+                projectId: project.id,
+                planId: activePlan?.id || null,
+                startDate,
+                endDate,
+                assemblies,
+                components,
+                maintenances
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const planName = activePlan ? activePlan.name.replace(/[^a-zA-Z0-9а-яА-Я]/g, '_') : 'history';
+            a.download = `monthly_report_${planName}_${startDate}_${endDate}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            message.success('Отчет успешно скачан');
+        } catch (error) {
+            console.error('❌ Ошибка генерации отчета:', error);
+            message.error('Не удалось сгенерировать отчет: ' + error.message);
+            throw error;
+        }
+    }, [project, activePlan]);
 
     return (
         <div className="timeline-tab">
@@ -1562,19 +1597,30 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                             <Space>
                                 <Typography.Text>Дата начала:</Typography.Text>
                                 <DatePicker
-                                    value={planFormStartDate}           // ✅ ИЗ STATE ФОРМЫ
-                                    onChange={handlePlanFormStartChange} // ✅ ФУНКЦИЯ ФОРМЫ
+                                    value={planFormStartDate}
+                                    onChange={handlePlanFormStartChange}
                                     format={DATE_FORMAT}
                                     allowClear={false}
+                                    disabledDate={(current) => {
+                                        if (!project?.historyUpdatedAt) return false;
+                                        const historyDate = dayjs(project.historyUpdatedAt).startOf('day');
+                                        return current && current.isBefore(historyDate, 'day');
+                                    }}
+                                    placeholder="Дата начала плана"
                                 />
                             </Space>
                             <Space>
                                 <Typography.Text>Дата окончания:</Typography.Text>
                                 <DatePicker
-                                    value={planFormEndDate}             // ✅ ИЗ STATE ФОРМЫ
-                                    onChange={handlePlanFormEndChange}   // ✅ ФУНКЦИЯ ФОРМЫ
+                                    value={planFormEndDate}
+                                    onChange={handlePlanFormEndChange}
                                     format={DATE_FORMAT}
                                     allowClear={false}
+                                    disabledDate={(current) => {
+                                        if (!planFormStartDate) return false;
+                                        return current && current.isBefore(planFormStartDate, 'day');
+                                    }}
+                                    placeholder="Дата окончания плана"
                                 />
                             </Space>
                             <Button
@@ -1610,7 +1656,8 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                     style={{
                                         padding: '6px 10px',
                                         borderRadius: 4,
-                                        border: `${(activePlanId === plan.id) ? '1px solid #1890ff' :'1px solid #f0f0f0'}`,
+                                        borderColor: activePlanId === plan.id ? '#1890ff' : undefined,
+                                        border: '1px solid',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
@@ -1727,10 +1774,17 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                         </Button>
                         <Button
                             type="primary"
-                            onClick={handleDownloadTemplate}
+                            onClick={handleOpenDownloadTemplateModal}
                             loading={isDownloadingTemplate}
                         >
                             Скачать шаблон
+                        </Button>
+                        <Button
+                            type="primary"
+                            onClick={handleOpenMonthlyReportModal}
+                            icon={<FileExcelOutlined />}
+                        >
+                            Выгрузить месячный отчет
                         </Button>
                     </Space>
                 </div>
@@ -1772,20 +1826,10 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                             type={activePlan?.id === plan.id ? 'primary' : 'default'}
                                             onClick={() => handleSelectPlan(plan)}
                                             style={{
-                                                borderColor: activePlan?.id === plan.id ? '#1890ff' : undefined
+                                                borderColor: activePlan?.id === plan.id ? '#1890ff' : 'gray'
                                             }}
                                         >
                                             {plan.name}
-                                            {/*{planTimelines[plan.id] && (*/}
-                                            {/*    <Badge*/}
-                                            {/*        count="*"*/}
-                                            {/*        style={{*/}
-                                            {/*            marginLeft: 4,*/}
-                                            {/*            backgroundColor: '#52c41a'*/}
-                                            {/*        }}*/}
-                                            {/*        title="Есть несохраненные изменения"*/}
-                                            {/*    />*/}
-                                            {/*)}*/}
                                         </Button>
                                         {/*<Button*/}
                                         {/*    danger*/}
@@ -2025,7 +2069,19 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                     </div>
                 </div>
             )}
-
+            <DownloadTemplateModal
+                visible={isDownloadTemplateModalVisible}
+                onClose={handleCloseDownloadTemplateModal}
+                onDownload={handleDownloadTemplate}
+                loading={isDownloadingTemplate}
+            />
+            <MonthlyReportModal
+                visible={isMonthlyReportModalVisible}
+                onClose={handleCloseMonthlyReportModal}
+                project={project}
+                planId={activePlan?.id || null}
+                onGenerate={handleGenerateMonthlyReport}
+            />
         </div>
     );
 };
