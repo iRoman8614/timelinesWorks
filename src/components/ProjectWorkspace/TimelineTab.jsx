@@ -10,7 +10,7 @@ import {
     Progress,
     Alert,
     Descriptions,
-    Input
+    Input, Spin
 } from 'antd';
 import { LoadingOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import Timeline from 'react-timelines';
@@ -20,50 +20,108 @@ import { getContrastTextColor } from '../../utils/contrastTextColor';
 import { useFluxTimelineGeneration } from '../../hooks/useFluxTimelineGeneraion';
 import dayjs from 'dayjs';
 import { serverProjectsApi, plansApi, projectHistoryApi } from '../../services/apiService';
+import { useSearchParams } from 'react-router-dom';
+import {
+    HistoryOutlined,
+    DeleteOutlined,
+    ToolOutlined,
+    BulbOutlined,
+    DashboardOutlined
+} from '@ant-design/icons';
+import { Badge, Statistic, Divider } from 'antd';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const ASSIGNMENT_DATETIME_FORMAT = 'YYYY-MM-DDTHH:mm:ss';
 
 const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMaintenance, apiBaseUrl = '/api' }) => {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [zoom, setZoom] = useState(30);
     const [assignmentForm] = Form.useForm();
     const [openTracks, setOpenTracks] = useState({});
     const [includeOperatingInterval, setIncludeOperatingInterval] = useState(false);
     const [forceRenderKey, setForceRenderKey] = useState(0);
     const [selectedElement, setSelectedElement] = useState(null);
-    const [selectedPlan, setSelectedPlan] = useState(null);
 
     const [planName, setPlanName] = useState('');
     const [isSavingPlan, setIsSavingPlan] = useState(false);
+    const [planFormStartDate, setPlanFormStartDate] = useState(() =>
+        dayjs().startOf('year')
+    );
+    const [planFormEndDate, setPlanFormEndDate] = useState(() =>
+        dayjs().endOf('year')
+    );
 
     const [plans, setPlans] = useState([]);
     const [isLoadingPlans, setIsLoadingPlans] = useState(false);
     const [activePlanId, setActivePlanId] = useState(null);
     const [activePlan, setActivePlan] = useState(null);
+    const [planTimelines, setPlanTimelines] = useState({}); // Flux данные по планам
 
     const fileInputRef = useRef(null);
     const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
     const [isUploadingHistory, setIsUploadingHistory] = useState(false);
 
-    const [currentTimeline, setCurrentTimeline] = useState(selectedPlan?.timeline || project?.timeline || {});
+    const [currentTimeline, setCurrentTimeline] = useState({});
+    const [isProjectTimeline, setIsProjectTimeline] = useState(true);
 
     // Flux генерация
     const {
         isGenerating,
         progress,
         error: fluxError,
+        timeline: fluxTimeline,      // ← ДОБАВИТЬ
+        timelineVersion,              // ← ДОБАВИТЬ
+        retryCount,                   // ← ДОБАВИТЬ
         generatePlan,
         cancelGeneration,
         clearError
     } = useFluxTimelineGeneration();
 
+    const displayTimeline = useMemo(() => {
+        // Если план выбран
+        if (activePlan && !isProjectTimeline) {
+            // Приоритет: flux данные → сохраненные данные плана → пустой
+            return planTimelines[activePlan.id] || activePlan.timeline || {};
+        }
+        // Если план не выбран или выбран режим проекта
+        return project?.timeline || {};
+    }, [activePlan, isProjectTimeline, planTimelines, project?.timeline]);
+
+
+
+    // Определяем можно ли редактировать таймлайн
+    const canEditTimeline = useMemo(() => {
+        return activePlan && !isProjectTimeline;
+    }, [activePlan, isProjectTimeline]);
+
+
+    const updatePlanTimeline = useCallback((planId, timeline) => {
+        console.log('📝 Обновление таймлайна плана:', planId);
+        setPlanTimelines(prev => ({
+            ...prev,
+            [planId]: timeline
+        }));
+    }, []);
+
+    // Сброс к историческому таймлайну проекта
+    const resetToProjectTimeline = useCallback(() => {
+        console.log('🔙 Возврат к историческому таймлайну проекта');
+        setActivePlan(null);
+        setIsProjectTimeline(true);
+        setSearchParams({});
+        setForceRenderKey(k => k + 1);
+    }, [setSearchParams]);
+
+
+
+
     // const timeline = project?.timeline || {};
     // const currentTimeline = selectedPlan?.timeline || project?.timeline || {};
 
-    const timeline = currentTimeline;
+    const timeline = displayTimeline;
 
-    const projectStart = timeline?.start || project?.start;
-    const projectEnd = timeline?.end || project?.end;
+    const projectStart = activePlan?.startTime || project?.start;
+    const projectEnd = activePlan?.endTime || project?.end;
 
     const currentYear = dayjs().year();
     const defaultStart = dayjs().year(currentYear).startOf('year');
@@ -93,6 +151,42 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             message.error(fluxError);
         }
     }, [fluxError]);
+
+
+
+    useEffect(() => {
+        // Flux обновления применяются ТОЛЬКО к выбранному плану
+        if (fluxTimeline && activePlan && !isProjectTimeline) {
+            console.log('🔄 Flux update для плана:', activePlan.name);
+
+            // Сохраняем в planTimelines (временное хранилище)
+            setPlanTimelines(prev => ({
+                ...prev,
+                [activePlan.id]: fluxTimeline
+            }));
+
+            // НЕ обновляем project.timeline - это критично!
+        }
+    }, [fluxTimeline, timelineVersion, activePlan, isProjectTimeline]);
+
+    // Загрузка плана из URL при монтировании
+    useEffect(() => {
+        const planIdFromUrl = searchParams.get('planId');
+
+        if (planIdFromUrl && plans.length > 0) {
+            const planToLoad = plans.find(p => p.id === planIdFromUrl);
+
+            if (planToLoad) {
+                console.log('🔗 Загрузка плана из URL:', planIdFromUrl);
+                handleSelectPlan(planToLoad);
+            } else {
+                console.warn('⚠️ План из URL не найден:', planIdFromUrl);
+                setSearchParams({});
+            }
+        }
+    }, [plans.length]); // Только при загрузке планов
+
+
 
     const getStateColor = (stateType) => {
         const colors = {
@@ -206,6 +300,118 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
         loadPlans();
     }, [loadPlans]);
 
+    // Изменение дат таймлайна
+// ✅ НОВЫЕ ФУНКЦИИ - обновляют даты ПЛАНА
+    const handlePlanStartChange = useCallback((date) => {
+        if (!date || !activePlan) return;
+
+        const updatedPlan = {
+            ...activePlan,
+            startTime: date.format('YYYY-MM-DDTHH:mm:ss')
+        };
+
+        setActivePlan(updatedPlan);
+
+        // Обновляем в списке планов
+        setPlans(prev =>
+            prev.map(p => p.id === activePlan.id ? updatedPlan : p)
+        );
+
+        setForceRenderKey(k => k + 1);
+    }, [activePlan]);
+
+    const handlePlanEndChange = useCallback((date) => {
+        if (!date || !activePlan) return;
+
+        const updatedPlan = {
+            ...activePlan,
+            endTime: date.format('YYYY-MM-DDTHH:mm:ss')
+        };
+
+        setActivePlan(updatedPlan);
+
+        // Обновляем в списке планов
+        setPlans(prev =>
+            prev.map(p => p.id === activePlan.id ? updatedPlan : p)
+        );
+
+        setForceRenderKey(k => k + 1);
+    }, [activePlan]);
+    const handleSelectPlan = useCallback(
+        async (plan) => {
+            if (!plan?.id) return;
+
+            try {
+                console.log('🎯 Выбор плана:', plan.name);
+
+                // Загружаем полные данные плана
+                const fullPlan = await plansApi.getById(plan.id);
+
+                let planTimeline = fullPlan.timeline || fullPlan.timeLine;
+
+                // Парсим если это строка
+                if (typeof planTimeline === 'string') {
+                    try {
+                        planTimeline = JSON.parse(planTimeline);
+                    } catch (e) {
+                        console.error('Ошибка парсинга timeline плана:', e);
+                        message.error('Не удалось прочитать таймлайн плана');
+                        return;
+                    }
+                }
+
+                // Устанавливаем активный план
+                setActivePlan(fullPlan);
+                setActivePlanId(fullPlan.id);
+                setIsProjectTimeline(false);  // Переключаем на режим плана
+
+                // Если есть flux данные для этого плана - используем их
+                // Иначе используем сохраненный timeline плана
+                if (!planTimelines[fullPlan.id] && planTimeline) {
+                    setPlanTimelines(prev => ({
+                        ...prev,
+                        [fullPlan.id]: planTimeline
+                    }));
+                }
+
+                // if (fullPlan.startTime && fullPlan.endTime && onProjectUpdate) {
+                //     onProjectUpdate({
+                //         ...project,
+                //         start: dayjs(fullPlan.startTime).format(DATE_FORMAT),
+                //         end: dayjs(fullPlan.endTime).format(DATE_FORMAT),
+                //     });
+                //     console.log('📅 Обновлены даты проекта:', {
+                //         start: fullPlan.startTime,
+                //         end: fullPlan.endTime
+                //     });
+                // }
+
+                // ❌ НЕ обновляем project.timeline!
+
+                setForceRenderKey(k => k + 1);
+                message.success(`План "${fullPlan.name}" загружен`);
+
+                // Обновляем URL
+                setSearchParams({ planId: fullPlan.id });
+            } catch (e) {
+                console.error('Ошибка загрузки плана:', e);
+                message.error('Не удалось загрузить план: ' + e.message);
+            }
+        },
+        [planTimelines, setSearchParams, onProjectUpdate, project]
+    );
+
+    const handlePlanFormStartChange = useCallback((date) => {
+        if (!date) return;
+        setPlanFormStartDate(date);
+        console.log('📅 Дата начала плана изменена:', date.format('YYYY-MM-DD'));
+    }, []);
+
+    const handlePlanFormEndChange = useCallback((date) => {
+        if (!date) return;
+        setPlanFormEndDate(date);
+        console.log('📅 Дата окончания плана изменена:', date.format('YYYY-MM-DD'));
+    }, []);
 
     const handleSavePlan = useCallback(async () => {
         if (!project || !project.id) {
@@ -226,70 +432,33 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                 name: planName.trim(),
                 description: `План создан ${dayjs().format('DD.MM.YYYY HH:mm')}`,
                 projectId: project.id,
-                start: timelineStartDayjs.format('YYYY-MM-DDTHH:mm:ss'),
-                end: timelineEndDayjs.format('YYYY-MM-DDTHH:mm:ss'),
+                start: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
+                end: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss'),
                 timeline: JSON.stringify(project.timeline || {})
             };
 
-            await plansApi.create(planData).then(serverProjectsApi.getById(project.id));
-            message.success(`План "${planName}" сохранен`);
+            console.log('💾 Создание плана:', {
+                name: planName,
+                start: planFormStartDate.format('YYYY-MM-DDTHH:mm:ss'),
+                end: planFormEndDate.format('YYYY-MM-DDTHH:mm:ss')
+            });
+
+            const newPlan = await plansApi.create(planData);
+
+            setPlans(prev => [...prev, newPlan]);
+
+            await handleSelectPlan(newPlan);
+
+            message.success(`План "${planName}" создан`);
             setPlanName('');
-            await loadPlans()
         } catch (error) {
             console.error('Ошибка создания плана:', error);
-            message.error('Не удалось сохранить план: ' + error.message);
+            message.error('Не удалось создать план: ' + error.message);
         } finally {
             setIsSavingPlan(false);
         }
-    }, [project, planName, timelineStartDayjs, timelineEndDayjs, loadPlans]);
+    }, [project, planName, planFormStartDate, planFormEndDate, handleSelectPlan]);
 
-    const handleSelectPlan = useCallback(
-        async (plan) => {
-            if (!project || !onProjectUpdate || !plan?.id) return;
-
-            try {
-                setActivePlanId(plan.id);
-                setActivePlan(plan)
-                console.log('plan', activePlan)
-
-                const fullPlan = await plansApi.getById(plan.id);
-
-                let planTimeline = fullPlan.timeline || fullPlan.timeLine;
-
-                if (!planTimeline) {
-                    message.warning('У выбранного плана нет данных таймлайна');
-                    return;
-                }
-
-                if (typeof planTimeline === 'string') {
-                    try {
-                        planTimeline = JSON.parse(planTimeline);
-                    } catch (e) {
-                        console.error('Ошибка парсинга timeline плана:', e, planTimeline);
-                        message.error('Не удалось прочитать таймлайн плана');
-                        return;
-                    }
-                }
-
-                const updatedProject = {
-                    ...project,
-                    start: fullPlan.start || project.start,
-                    end: fullPlan.end || project.end,
-                    timeline: planTimeline
-                };
-
-                onProjectUpdate(updatedProject);
-                setForceRenderKey((k) => k + 1);
-                message.success(`План "${fullPlan.name || plan.name}" загружен`);
-            } catch (e) {
-                console.error('Ошибка загрузки плана:', e);
-                message.error('Не удалось загрузить план: ' + e.message);
-            } finally {
-                setActivePlanId(null);
-            }
-        },
-        [project, onProjectUpdate]
-    );
 
     const handleDeletePlan = useCallback(
         async (planId) => {
@@ -774,26 +943,14 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     }, [timelineStartDate, timelineEndDate]);
     const now = useMemo(() => new Date(), []);
 
-    const handleStartChange = useCallback((date) => {
-        if (!date || !onProjectUpdate) return;
-        onProjectUpdate({
-            ...project,
-            start: date.format(DATE_FORMAT),
-            timeline: { ...timeline }
-        });
-    }, [project, timeline, onProjectUpdate]);
-
-    const handleEndChange = useCallback((date) => {
-        if (!date || !onProjectUpdate) return;
-        onProjectUpdate({
-            ...project,
-            end: date.format(DATE_FORMAT),
-            timeline: { ...timeline }
-        });
-    }, [project, timeline, onProjectUpdate]);
-
     const handleAssignmentSubmit = useCallback((values) => {
-        if (!project || !onProjectUpdate) {
+        // ✅ ПРОВЕРКА УЖЕ ЕСТЬ
+        if (!activePlan || isProjectTimeline) {
+            message.error('Для назначения деталей выберите план');
+            return;
+        }
+
+        if (!project) {
             return;
         }
 
@@ -837,28 +994,36 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             operatingInterval: includeOperatingInterval ? values.operatingInterval : null
         };
 
-        const existingAssignments = timeline.unitAssignments || [];
+        // ✅ ПОЛУЧАЕМ ТЕКУЩИЙ ТАЙМЛАЙН ПЛАНА
+        const currentPlanTimeline = planTimelines[activePlan.id] || activePlan.timeline || {};
+
+        const existingAssignments = currentPlanTimeline.unitAssignments || [];
         const updatedAssignments = [...existingAssignments, assignment]
             .sort((a, b) => dayjs(a.dateTime).valueOf() - dayjs(b.dateTime).valueOf());
 
-        onProjectUpdate({
-            ...project,
-            timeline: {
-                ...timeline,
-                assemblyStates: timeline.assemblyStates || [],
-                unitAssignments: updatedAssignments,
-                maintenanceEvents: timeline.maintenanceEvents || []
-            }
-        });
+        // ✅ ОБНОВЛЯЕМ ТАЙМЛАЙН ПЛАНА
+        const updatedTimeline = {
+            ...currentPlanTimeline,
+            assemblyStates: currentPlanTimeline.assemblyStates || [],
+            unitAssignments: updatedAssignments,
+            maintenanceEvents: currentPlanTimeline.maintenanceEvents || []
+        };
+
+        updatePlanTimeline(activePlan.id, updatedTimeline);
 
         assignmentForm.resetFields();
         setIncludeOperatingInterval(false);
-        message.success('Назначение детали добавлено');
-    }, [assignmentForm, assemblyOptionMap, assemblyTypeMap, onProjectUpdate, project, timeline, unitOptions, includeOperatingInterval]);
-
+        message.success('Назначение детали добавлено (не забудьте сохранить план)');
+    }, [assignmentForm, assemblyOptionMap, assemblyTypeMap, project, unitOptions, includeOperatingInterval, activePlan, isProjectTimeline, planTimelines, updatePlanTimeline]);
 
     const handleMaintenanceEventSubmit = useCallback(async (values) => {
-        if (!project || !onProjectUpdate) return;
+        // ✅ ДОБАВИТЬ ПРОВЕРКУ
+        if (!activePlan || isProjectTimeline) {
+            message.error('Для добавления работ выберите план');
+            return;
+        }
+
+        if (!project) return;
 
         const cleanUnitId = normalizeUnitId(values.unitId);
 
@@ -869,80 +1034,111 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             custom: true,
         };
 
+        // Получаем текущий таймлайн плана
+        const currentPlanTimeline = planTimelines[activePlan.id] || activePlan.timeline || {};
+
         const updatedTimeline = {
-            ...project.timeline,
+            ...currentPlanTimeline,
             maintenanceEvents: [
-                ...(project.timeline?.maintenanceEvents || []),
+                ...(currentPlanTimeline.maintenanceEvents || []),
                 event
             ].sort((a, b) => dayjs(a.dateTime) - dayjs(b.dateTime)),
         };
 
-        const tempProject = {
-            ...project,
-            timeline: updatedTimeline
-        };
+        // Обновляем таймлайн плана
+        updatePlanTimeline(activePlan.id, updatedTimeline);
+        message.success('Внеплановая работа добавлена (не забудьте сохранить план)');
+    }, [activePlan, isProjectTimeline, planTimelines, updatePlanTimeline]);
 
-        await serverProjectsApi.save(tempProject);
-
-        const freshProject = await serverProjectsApi.getById(project.id);
-
-        onProjectUpdate(freshProject);
-
-        message.success('Внеплановая работа добавлена');
-    }, [project, onProjectUpdate]);
 
     const handleGeneratePlan = useCallback(async () => {
-        console.log('🚀 handleGeneratePlan вызван');
-        console.log('activePlan:', activePlan);
+        console.log('🚀 Запуск генерации плана');
 
         if (!activePlan) {
-            console.error('❌ Проект не загружен');
-            message.error('Проект не загружен');
+            message.error('План не выбран. Создайте или выберите план для генерации.');
             return;
         }
 
         if (!activePlan.startTime || !activePlan.endTime) {
-            console.error('❌ У проекта нет дат:', { start: activePlan.startTime, end: activePlan.endTime });
-            message.error('У проекта отсутствуют даты start и end. Установите их через DatePicker выше.');
+            message.error('У плана отсутствуют даты. Установите их через DatePicker.');
             return;
         }
 
-        console.log('✅ Проверки пройдены, вызываем generatePlan');
-        console.log('generatePlan function:', generatePlan);
+        console.log('✅ Генерация плана:', {
+            planId: activePlan.id,
+            planName: activePlan.name,
+            period: `${activePlan.startTime} - ${activePlan.endTime}`
+        });
 
         try {
-            await generatePlan(project, activePlan, async (generatedTimeline) => {
-                console.log('✅ Получен сгенерированный timeline:', generatedTimeline);
+            clearError();
 
-                setCurrentTimeline(generatedTimeline)
+            // ✅ Flux обновит planTimelines через useEffect
+            // ✅ project.timeline НЕ затронется
+            await generatePlan(project, activePlan);
 
-                // const updatedProject = {
-                //     ...project,
-                //     timeline: generatedTimeline,
-                // };
-
-                // Обновляем только локальный state
-                // Сохранение на сервер произойдет по кнопке "Сохранить"
-                //onProjectUpdate(updatedProject);
-
-                message.success('План ТО успешно сгенерирован (не забудьте сохранить)');
-            });
+            // Сообщение покажется автоматически после завершения
         } catch (error) {
-            console.error('❌ Error generating plan:', error);
+            console.error('❌ Ошибка генерации плана:', error);
             message.error('Ошибка при генерации плана ТО');
         }
-    }, [project, activePlan, generatePlan, onProjectUpdate]);
+    }, [project, activePlan, generatePlan, clearError]);
 
-    const handlePlanUpdate = async ({timelne}) => {
-        plansApi.create({
-            'id': activePlan.id,
-            'name': activePlan.name,
-            "startTime": activePlan.startTime,
-            "endTime": activePlan.endTime,
-            'projectId': activePlan.projectId,
-            'timelne': JSON.stringify(timelne),
-        })
-    }
+
+    const handlePlanUpdate = useCallback(async () => {
+        if (!activePlan) {
+            message.error('План не выбран');
+            return;
+        }
+
+        // Берем таймлайн: сначала flux данные, потом сохраненные
+        const timelineToSave = planTimelines[activePlan.id] || activePlan.timeline;
+
+        if (!timelineToSave || Object.keys(timelineToSave).length === 0) {
+            message.error('Нет данных таймлайна для сохранения');
+            return;
+        }
+
+        try {
+            console.log('💾 Обновление плана:', {
+                planId: activePlan.id,
+                planName: activePlan.name,
+                eventsCount: timelineToSave.maintenanceEvents?.length || 0,
+                hasFluxData: !!planTimelines[activePlan.id]
+            });
+
+            await plansApi.create({
+                id: activePlan.id,
+                name: activePlan.name,
+                description: activePlan.description,
+                projectId: activePlan.projectId,
+                start: activePlan.startTime,
+                end: activePlan.endTime,
+                timeline: JSON.stringify(timelineToSave)
+            })
+
+            // Обновляем план в списке
+            setPlans(prev =>
+                prev.map(p => p.id === activePlan.id
+                    ? { ...p, timeline: timelineToSave }
+                    : p
+                )
+            );
+
+            // Обновляем activePlan
+            setActivePlan(prev => ({
+                ...prev,
+                timeline: timelineToSave
+            }));
+
+            message.success(`План "${activePlan.name}" успешно сохранен`);
+        } catch (error) {
+            console.error('❌ Ошибка сохранения плана:', error);
+            message.error('Не удалось сохранить план: ' + error.message);
+        }
+    }, [activePlan, planTimelines]);
+
+
 
     const hasAssemblies = assemblyOptions.length > 0;
     const hasUnits = unitOptions.some(option => option.componentTypeId);
@@ -1069,79 +1265,164 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     };
 
 
-    const handleDeleteSelectedElement = useCallback(
-        () => {
-            if (!selectedElement || !project || !onProjectUpdate) return;
-            const meta = selectedElement.meta;
-            if (!meta) return;
+    // const handleDeleteSelectedElement = useCallback(
+    //     () => {
+    //         if (!activePlan || isProjectTimeline) {
+    //             message.error('Удаление возможно только для выбранного плана');
+    //             return;
+    //         }
+    //
+    //         if (!selectedElement || !selectedElement.meta) {
+    //             return;
+    //         }
+    //
+    //         if (!selectedElement || !project || !onProjectUpdate) return;
+    //         const meta = selectedElement.meta;
+    //         if (!meta) return;
+    //
+    //         try {
+    //             let updatedTimeline = { ...(project.timeline || {}) };
+    //
+    //             if (meta.kind === 'unitAssignment' && meta.assignment) {
+    //                 const prev = updatedTimeline.unitAssignments || [];
+    //                 updatedTimeline = {
+    //                     ...updatedTimeline,
+    //                     unitAssignments: prev.filter((a) => {
+    //                         // Сравниваем по полям, а не по ссылке
+    //                         return !(
+    //                             a.unitId === meta.assignment.unitId &&
+    //                             a.componentOfAssembly?.assemblyId === meta.assignment.componentOfAssembly?.assemblyId &&
+    //                             a.dateTime === meta.assignment.dateTime
+    //                         );
+    //                     }),
+    //                 };
+    //             }
+    //
+    //             if (meta.kind === 'maintenanceEvent' && meta.event) {
+    //                 const prev = updatedTimeline.maintenanceEvents || [];
+    //                 updatedTimeline = {
+    //                     ...updatedTimeline,
+    //                     maintenanceEvents: prev.filter((e) => {
+    //                         // Сравниваем по полям
+    //                         return !(
+    //                             e.maintenanceTypeId === meta.event.maintenanceTypeId &&
+    //                             e.unitId === meta.event.unitId &&
+    //                             e.dateTime === meta.event.dateTime
+    //                         );
+    //                     }),
+    //                 };
+    //             }
+    //
+    //             if (meta.kind === 'assemblyState' && meta.state) {
+    //                 const prev = updatedTimeline.assemblyStates || [];
+    //                 updatedTimeline = {
+    //                     ...updatedTimeline,
+    //                     assemblyStates: prev.filter((s) => {
+    //                         // Сравниваем по полям
+    //                         return !(
+    //                             s.assemblyId === meta.state.assemblyId &&
+    //                             s.type === meta.state.type &&
+    //                             s.dateTime === meta.state.dateTime
+    //                         );
+    //                     }),
+    //                 };
+    //             }
+    //
+    //             const updatedProject = {
+    //                 ...project,
+    //                 timeline: updatedTimeline,
+    //             };
+    //
+    //             // Обновляем только локальный state, без сохранения на сервер
+    //             // Сохранение произойдет по кнопке "Сохранить" в хедере
+    //             onProjectUpdate(updatedProject);
+    //             message.success('Элемент удалён (не забудьте сохранить)');
+    //
+    //             setSelectedElement(null);
+    //             setForceRenderKey((k) => k + 1);
+    //         } catch (err) {
+    //             console.error('Ошибка при удалении элемента таймлайна', err);
+    //             message.error('Не удалось удалить элемент');
+    //         }
+    //     },
+    //     [selectedElement, project, onProjectUpdate]
+    // );
 
-            try {
-                let updatedTimeline = { ...(project.timeline || {}) };
+    const handleDeleteSelectedElement = useCallback(() => {
+        // ✅ ДОБАВИТЬ ПРОВЕРКУ В НАЧАЛО
+        if (!activePlan || isProjectTimeline) {
+            message.error('Удаление возможно только для выбранного плана');
+            return;
+        }
 
-                if (meta.kind === 'unitAssignment' && meta.assignment) {
-                    const prev = updatedTimeline.unitAssignments || [];
-                    updatedTimeline = {
-                        ...updatedTimeline,
-                        unitAssignments: prev.filter((a) => {
-                            // Сравниваем по полям, а не по ссылке
-                            return !(
-                                a.unitId === meta.assignment.unitId &&
-                                a.componentOfAssembly?.assemblyId === meta.assignment.componentOfAssembly?.assemblyId &&
-                                a.dateTime === meta.assignment.dateTime
-                            );
-                        }),
-                    };
-                }
+        if (!selectedElement || !selectedElement.meta) {
+            return;
+        }
 
-                if (meta.kind === 'maintenanceEvent' && meta.event) {
-                    const prev = updatedTimeline.maintenanceEvents || [];
-                    updatedTimeline = {
-                        ...updatedTimeline,
-                        maintenanceEvents: prev.filter((e) => {
-                            // Сравниваем по полям
-                            return !(
-                                e.maintenanceTypeId === meta.event.maintenanceTypeId &&
-                                e.unitId === meta.event.unitId &&
-                                e.dateTime === meta.event.dateTime
-                            );
-                        }),
-                    };
-                }
+        try {
+            const { meta } = selectedElement;
 
-                if (meta.kind === 'assemblyState' && meta.state) {
-                    const prev = updatedTimeline.assemblyStates || [];
-                    updatedTimeline = {
-                        ...updatedTimeline,
-                        assemblyStates: prev.filter((s) => {
-                            // Сравниваем по полям
-                            return !(
-                                s.assemblyId === meta.state.assemblyId &&
-                                s.type === meta.state.type &&
-                                s.dateTime === meta.state.dateTime
-                            );
-                        }),
-                    };
-                }
+            // Получаем текущий таймлайн плана
+            const currentPlanTimeline = planTimelines[activePlan.id] || activePlan.timeline || {};
+            let updatedTimeline = { ...currentPlanTimeline };
 
-                const updatedProject = {
-                    ...project,
-                    timeline: updatedTimeline,
+            // Удаление unitAssignment
+            if (meta.kind === 'unitAssignment' && meta.assignment) {
+                const prev = updatedTimeline.unitAssignments || [];
+                updatedTimeline = {
+                    ...updatedTimeline,
+                    unitAssignments: prev.filter((a) => {
+                        return !(
+                            a.unitId === meta.assignment.unitId &&
+                            a.dateTime === meta.assignment.dateTime
+                        );
+                    }),
                 };
-
-                // Обновляем только локальный state, без сохранения на сервер
-                // Сохранение произойдет по кнопке "Сохранить" в хедере
-                onProjectUpdate(updatedProject);
-                message.success('Элемент удалён (не забудьте сохранить)');
-
-                setSelectedElement(null);
-                setForceRenderKey((k) => k + 1);
-            } catch (err) {
-                console.error('Ошибка при удалении элемента таймлайна', err);
-                message.error('Не удалось удалить элемент');
             }
-        },
-        [selectedElement, project, onProjectUpdate]
-    );
+
+            // Удаление maintenanceEvent
+            if (meta.kind === 'maintenanceEvent' && meta.event) {
+                const prev = updatedTimeline.maintenanceEvents || [];
+                updatedTimeline = {
+                    ...updatedTimeline,
+                    maintenanceEvents: prev.filter((e) => {
+                        return !(
+                            e.maintenanceTypeId === meta.event.maintenanceTypeId &&
+                            e.unitId === meta.event.unitId &&
+                            e.dateTime === meta.event.dateTime
+                        );
+                    }),
+                };
+            }
+
+            // Удаление assemblyState
+            if (meta.kind === 'assemblyState' && meta.state) {
+                const prev = updatedTimeline.assemblyStates || [];
+                updatedTimeline = {
+                    ...updatedTimeline,
+                    assemblyStates: prev.filter((s) => {
+                        return !(
+                            s.assemblyId === meta.state.assemblyId &&
+                            s.type === meta.state.type &&
+                            s.dateTime === meta.state.dateTime
+                        );
+                    }),
+                };
+            }
+
+            // ✅ Обновляем ТОЛЬКО таймлайн плана
+            updatePlanTimeline(activePlan.id, updatedTimeline);
+
+            message.success('Элемент удалён (не забудьте сохранить план)');
+            setSelectedElement(null);
+            setForceRenderKey((k) => k + 1);
+        } catch (err) {
+            console.error('Ошибка при удалении элемента таймлайна', err);
+            message.error('Не удалось удалить элемент');
+        }
+    }, [selectedElement, activePlan, isProjectTimeline, planTimelines, updatePlanTimeline]);
+
+
 
     // Скачать шаблон Excel
     const handleDownloadTemplate = useCallback(async () => {
@@ -1174,13 +1455,51 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     }, [project]);
 
     // Загрузить файл истории
+    // const handleUploadHistory = useCallback(async (event) => {
+    //     const file = event.target.files?.[0];
+    //     if (!file) return;
+    //
+    //     if (!project || !project.id) {
+    //         message.error('Проект не загружен');
+    //         event.target.value = ''; // Очистить input
+    //         return;
+    //     }
+    //
+    //     try {
+    //         setIsUploadingHistory(true);
+    //         const result = await projectHistoryApi.loadHistory(project.id, file);
+    //
+    //         message.success('Файл истории загружен');
+    //
+    //         // Если API вернул обновленные данные timeline, применить их
+    //         if (result && result.timeline) {
+    //             const updatedProject = {
+    //                 ...project,
+    //                 timeline: result.timeline
+    //             };
+    //             onProjectUpdate(updatedProject);
+    //         } else {
+    //             // Если данных нет, просто перезагрузить проект
+    //             if (onProjectUpdate && typeof onProjectUpdate === 'function') {
+    //                 message.info('Обновите страницу для применения изменений');
+    //             }
+    //         }
+    //     } catch (error) {
+    //         console.error('Ошибка загрузки файла истории:', error);
+    //         message.error('Не удалось загрузить файл: ' + error.message);
+    //     } finally {
+    //         setIsUploadingHistory(false);
+    //         event.target.value = ''; // Очистить input для повторной загрузки
+    //     }
+    // }, [project, onProjectUpdate]);
+
     const handleUploadHistory = useCallback(async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         if (!project || !project.id) {
             message.error('Проект не загружен');
-            event.target.value = ''; // Очистить input
+            event.target.value = '';
             return;
         }
 
@@ -1190,74 +1509,85 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
             message.success('Файл истории загружен');
 
-            // Если API вернул обновленные данные timeline, применить их
+            // ✅ ВАЖНО: Обновляется ТОЛЬКО project.timeline
             if (result && result.timeline) {
                 const updatedProject = {
                     ...project,
-                    timeline: result.timeline
+                    timeline: result.timeline,
+                    historyUpdatedAt: result.historyUpdatedAt || new Date().toISOString()
                 };
+
+                // ✅ Обновляем проект через onProjectUpdate
                 onProjectUpdate(updatedProject);
-            } else {
-                // Если данных нет, просто перезагрузить проект
-                if (onProjectUpdate && typeof onProjectUpdate === 'function') {
-                    message.info('Обновите страницу для применения изменений');
+
+                // ✅ Если сейчас показываем исторический таймлайн - обновим его
+                if (isProjectTimeline) {
+                    setForceRenderKey(k => k + 1);
                 }
+
+                message.info('Исторический таймлайн проекта обновлен');
+            } else {
+                message.info('Обновите страницу для применения изменений');
             }
         } catch (error) {
             console.error('Ошибка загрузки файла истории:', error);
             message.error('Не удалось загрузить файл: ' + error.message);
         } finally {
             setIsUploadingHistory(false);
-            event.target.value = ''; // Очистить input для повторной загрузки
+            event.target.value = '';
         }
-    }, [project, onProjectUpdate]);
+    }, [project, onProjectUpdate, isProjectTimeline]);
 
 
 
     return (
         <div className="timeline-tab">
             <Card className="timeline-controls-card">
-                <div className="timeline-range-controls">
-                    <Typography.Text className="timeline-range-label">Создать новый план:</Typography.Text>
-                    <Space size="middle" wrap>
-                        <Space>
-                            <Typography.Text>Название:</Typography.Text>
-                            <Input
-                                placeholder="Введите название плана"
-                                value={planName}
-                                onChange={(e) => setPlanName(e.target.value)}
-                                style={{ width: 250 }}
-                                onPressEnter={handleSavePlan}
-                            />
+                <Card className="timeline-controls-card">
+                    <div className="timeline-range-controls">
+                        <Typography.Text className="timeline-range-label">
+                            Создать новый план:
+                        </Typography.Text>
+                        <Space size="middle" wrap>
+                            <Space>
+                                <Typography.Text>Название:</Typography.Text>
+                                <Input
+                                    placeholder="Введите название плана"
+                                    value={planName}
+                                    onChange={(e) => setPlanName(e.target.value)}
+                                    style={{ width: 250 }}
+                                    onPressEnter={handleSavePlan}
+                                />
+                            </Space>
+                            <Space>
+                                <Typography.Text>Дата начала:</Typography.Text>
+                                <DatePicker
+                                    value={planFormStartDate}           // ✅ ИЗ STATE ФОРМЫ
+                                    onChange={handlePlanFormStartChange} // ✅ ФУНКЦИЯ ФОРМЫ
+                                    format={DATE_FORMAT}
+                                    allowClear={false}
+                                />
+                            </Space>
+                            <Space>
+                                <Typography.Text>Дата окончания:</Typography.Text>
+                                <DatePicker
+                                    value={planFormEndDate}             // ✅ ИЗ STATE ФОРМЫ
+                                    onChange={handlePlanFormEndChange}   // ✅ ФУНКЦИЯ ФОРМЫ
+                                    format={DATE_FORMAT}
+                                    allowClear={false}
+                                />
+                            </Space>
+                            <Button
+                                type="primary"
+                                onClick={handleSavePlan}
+                                loading={isSavingPlan}
+                                disabled={!planName || planName.trim() === ''}
+                            >
+                                Создать план
+                            </Button>
                         </Space>
-                        <Space>
-                            <Typography.Text>Дата начала:</Typography.Text>
-                            <DatePicker
-                                value={timelineStartDayjs}
-                                onChange={handleStartChange}
-                                format={DATE_FORMAT}
-                                allowClear={false}
-                            />
-                        </Space>
-                        <Space>
-                            <Typography.Text>Дата окончания:</Typography.Text>
-                            <DatePicker
-                                value={timelineEndDayjs}
-                                onChange={handleEndChange}
-                                format={DATE_FORMAT}
-                                allowClear={false}
-                            />
-                        </Space>
-                        <Button
-                            type="primary"
-                            onClick={handleSavePlan}
-                            loading={isSavingPlan}
-                            disabled={!planName || planName.trim() === ''}
-                        >
-                            Создать план
-                        </Button>
-                    </Space>
-                </div>
+                    </div>
+                </Card>
 
                 <div className="timeline-range-controls" style={{ marginTop: 16 }}>
                     <Typography.Text className="timeline-range-label">
@@ -1280,7 +1610,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                     style={{
                                         padding: '6px 10px',
                                         borderRadius: 4,
-                                        border: '1px solid #f0f0f0',
+                                        border: `${(activePlanId === plan.id) ? '1px solid #1890ff' :'1px solid #f0f0f0'}`,
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
@@ -1307,7 +1637,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                     <Button
                                         danger
                                         size="small"
-                                        loading={activePlanId === plan.id}
+                                        // loading={activePlanId === plan.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeletePlan(plan.id);
@@ -1321,9 +1651,65 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                     )}
                 </div>
 
+                {/* Индикатор текущего режима */}
+                <Card style={{ marginBottom: 16, marginTop: 16 }}>
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                        <Typography.Title level={5}>
+                            Текущий режим:
+                        </Typography.Title>
+
+                        {isProjectTimeline ? (
+                            <Alert
+                                message="Просмотр исторического таймлайна"
+                                description="Данные из загруженного Excel файла (только чтение)"
+                                type="info"
+                                showIcon
+                            />
+                        ) : activePlan ? (
+                            <Alert
+                                message={`Работа с планом: ${activePlan.name}`}
+                                description={`Период: ${dayjs(activePlan.startTime).format('DD.MM.YYYY')} - ${dayjs(activePlan.endTime).format('DD.MM.YYYY')}`}
+                                type="success"
+                                showIcon
+                                action={
+                                    <Space>
+                                        <Button
+                                            size="small"
+                                            onClick={handlePlanUpdate}
+                                            disabled={!planTimelines[activePlan.id]}
+                                        >
+                                            Сохранить изменения
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={resetToProjectTimeline}
+                                        >
+                                            К историческому
+                                        </Button>
+                                    </Space>
+                                }
+                            />
+                        ) : (
+                            <Alert
+                                message="План не выбран"
+                                description="Создайте или выберите план для работы с таймлайном"
+                                type="warning"
+                                showIcon
+                            />
+                        )}
+                    </Space>
+                </Card>
 
                 <div className="timeline-range-controls" style={{ marginTop: 16 }}>
                     <Typography.Text className="timeline-range-label">Работа с историей:</Typography.Text>
+                    {project?.historyUpdatedAt && (
+                        <Alert
+                            message={`Последнее обновление истории: ${dayjs(project.historyUpdatedAt).format('DD.MM.YYYY')}`}
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: 8, marginTop: 8 }}
+                        />
+                    )}
                     <Space size="middle">
                         <input
                             ref={fileInputRef}
@@ -1353,21 +1739,99 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
             <Card className="timeline-controls-card">
                 <Space direction="vertical" style={{ width: '100%' }}>
+                    {/* Список планов */}
+                    <div className="timeline-range-controls">
+                        <Typography.Text className="timeline-range-label">
+                            Выберите план для работы:
+                        </Typography.Text>
+
+                        {isLoadingPlans ? (
+                            <Spin />
+                        ) : plans.length === 0 ? (
+                            <Alert
+                                message="Планы отсутствуют"
+                                description="Создайте первый план используя форму выше"
+                                type="warning"
+                                showIcon
+                            />
+                        ) : (
+                            <Space wrap size="small">
+                                {/* Кнопка исторического таймлайна */}
+                                <Button
+                                    type={isProjectTimeline ? 'primary' : 'default'}
+                                    onClick={resetToProjectTimeline}
+                                    icon={<HistoryOutlined />}
+                                >
+                                    Исторический таймлайн
+                                </Button>
+
+                                {/* Кнопки планов */}
+                                {plans.map(plan => (
+                                    <div key={plan.id} style={{ position: 'relative' }}>
+                                        <Button
+                                            type={activePlan?.id === plan.id ? 'primary' : 'default'}
+                                            onClick={() => handleSelectPlan(plan)}
+                                            style={{
+                                                borderColor: activePlan?.id === plan.id ? '#1890ff' : undefined
+                                            }}
+                                        >
+                                            {plan.name}
+                                            {/*{planTimelines[plan.id] && (*/}
+                                            {/*    <Badge*/}
+                                            {/*        count="*"*/}
+                                            {/*        style={{*/}
+                                            {/*            marginLeft: 4,*/}
+                                            {/*            backgroundColor: '#52c41a'*/}
+                                            {/*        }}*/}
+                                            {/*        title="Есть несохраненные изменения"*/}
+                                            {/*    />*/}
+                                            {/*)}*/}
+                                        </Button>
+                                        {/*<Button*/}
+                                        {/*    danger*/}
+                                        {/*    size="small"*/}
+                                        {/*    icon={<DeleteOutlined />}*/}
+                                        {/*    onClick={(e) => {*/}
+                                        {/*        e.stopPropagation();*/}
+                                        {/*        handleDeletePlan(plan.id);*/}
+                                        {/*    }}*/}
+                                        {/*    style={{*/}
+                                        {/*        position: 'absolute',*/}
+                                        {/*        top: -8,*/}
+                                        {/*        right: -8,*/}
+                                        {/*        borderRadius: '50%',*/}
+                                        {/*        width: 20,*/}
+                                        {/*        height: 20,*/}
+                                        {/*        minWidth: 20,*/}
+                                        {/*        padding: 0*/}
+                                        {/*    }}*/}
+                                        {/*/>*/}
+                                    </div>
+                                ))}
+                            </Space>
+                        )}
+                    </div>
                     <Space>
-                        {onOpenAddMaintenance && <Button
-                            type="primary"
-                            onClick={onOpenAddMaintenance}
-                            block
-                        >
-                            Назначить ТО
-                        </Button>}
-                        {onOpenAssignUnit && <Button
-                            type="primary"
-                            onClick={onOpenAssignUnit}
-                            block
-                        >
-                            Назначить деталь
-                        </Button>}
+                        {onOpenAddMaintenance && (
+                            <Button
+                                type="primary"
+                                onClick={onOpenAddMaintenance}
+                                disabled={!canEditTimeline}  // ← ДОБАВИТЬ
+                                block
+                            >
+                                Назначить ТО
+                            </Button>
+                        )}
+                        {onOpenAssignUnit && (
+                            <Button
+                                type="primary"
+                                onClick={onOpenAssignUnit}
+                                disabled={!canEditTimeline}  // ← ДОБАВИТЬ
+                                block
+                            >
+                                Назначить деталь
+                            </Button>
+                        )}
                     </Space>
                     <Space>
                         {activePlan !== null &&  <Typography.Text className="timeline-range-label">план {activePlan.name}</Typography.Text>}
@@ -1389,11 +1853,24 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                 Отменить
                             </Button>
                         )}
-                        <Button type="primary"
-                                onClick={(currentTimeline) => {handlePlanUpdate(currentTimeline)}}>
-                            Сохранить план
-                        </Button>
+                        {/*<Button*/}
+                        {/*    type="primary"*/}
+                        {/*    onClick={handlePlanUpdate}*/}
+                        {/*    disabled={!activePlan}*/}
+                        {/*>*/}
+                        {/*    Сохранить план*/}
+                        {/*</Button>*/}
                     </Space>
+
+                    {/* Индикатор переподключения */}
+                    {isGenerating && retryCount > 0 && (
+                        <Alert
+                            message={`Переподключение к серверу (попытка ${retryCount}/3)`}
+                            type="warning"
+                            showIcon
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
 
                     {/* Прогресс генерации */}
                     {isGenerating && progress && (
@@ -1403,6 +1880,11 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                 <Space direction="vertical" style={{ width: '100%' }}>
                                     <Typography.Text>{progress}</Typography.Text>
                                     <Progress percent={0} status="active" showInfo={false} />
+                                    {fluxTimeline && (
+                                        <Typography.Text type="success">
+                                            Получено событий ТО: {fluxTimeline.maintenanceEvents?.length || 0}
+                                        </Typography.Text>
+                                    )}
                                 </Space>
                             }
                             type="info"
@@ -1455,6 +1937,29 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             {/*        </Space>*/}
             {/*    </div>*/}
             {/*</Card>*/}
+
+            {/* Статистика текущего таймлайна */}
+            {/*{displayTimeline && Object.keys(displayTimeline).length > 0 && (*/}
+            {/*    <Card size="small" style={{ marginBottom: 16 }}>*/}
+            {/*        <Space split={<Divider type="vertical" />}>*/}
+            {/*            <Statistic*/}
+            {/*                title="Работы ТО"*/}
+            {/*                value={displayTimeline.maintenanceEvents?.length || 0}*/}
+            {/*                prefix={<ToolOutlined />}*/}
+            {/*            />*/}
+            {/*            <Statistic*/}
+            {/*                title="Назначения деталей"*/}
+            {/*                value={displayTimeline.unitAssignments?.length || 0}*/}
+            {/*                prefix={<BulbOutlined />}*/}
+            {/*            />*/}
+            {/*            <Statistic*/}
+            {/*                title="Состояния агрегатов"*/}
+            {/*                value={displayTimeline.assemblyStates?.length || 0}*/}
+            {/*                prefix={<DashboardOutlined />}*/}
+            {/*            />*/}
+            {/*        </Space>*/}
+            {/*    </Card>*/}
+            {/*)}*/}
 
             <Card className="timeline-chart" key={`timeline-card-${forceRenderKey}`}>
                 {hasTimelineData ? (
