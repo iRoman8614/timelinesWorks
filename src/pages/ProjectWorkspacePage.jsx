@@ -353,6 +353,63 @@ const ProjectWorkspacePage = () => {
         setSelectedItem(updated.nodes.find(n => n.id === selectedItem.id));
     };
 
+    const handleUpdateCondition = (index, updatedCondition) => {
+        const updateConditionInNode = (nodes) => {
+            return nodes.map(node => {
+                if (node.id === selectedItem.id) {
+                    const updatedConditions = [...node.conditions];
+                    updatedConditions[index] = updatedCondition;
+                    return {
+                        ...node,
+                        conditions: updatedConditions
+                    };
+                }
+                if (node.children) {
+                    return {
+                        ...node,
+                        children: updateConditionInNode(node.children)
+                    };
+                }
+                return node;
+            });
+        };
+
+        const updated = {
+            ...project,
+            nodes: updateConditionInNode(project.nodes)
+        };
+        updateProject(updated);
+        setSelectedItem(updated.nodes.find(n => n.id === selectedItem.id));
+    };
+
+    const handleDeleteCondition = (index) => {
+        const deleteConditionFromNode = (nodes) => {
+            return nodes.map(node => {
+                if (node.id === selectedItem.id) {
+                    const updatedConditions = node.conditions.filter((_, i) => i !== index);
+                    return {
+                        ...node,
+                        conditions: updatedConditions
+                    };
+                }
+                if (node.children) {
+                    return {
+                        ...node,
+                        children: deleteConditionFromNode(node.children)
+                    };
+                }
+                return node;
+            });
+        };
+
+        const updated = {
+            ...project,
+            nodes: deleteConditionFromNode(project.nodes)
+        };
+        updateProject(updated);
+        setSelectedItem(updated.nodes.find(n => n.id === selectedItem.id));
+    };
+
     const handleBackToProjects = () => {
         if (hasUnsavedChanges) {
             Modal.confirm({
@@ -1039,6 +1096,36 @@ const ProjectWorkspacePage = () => {
                 />
             </Modal>
 
+            {/*<Modal*/}
+            {/*    title={`Условия: ${selectedItem?.name}`}*/}
+            {/*    open={activeModal === 'conditions'}*/}
+            {/*    onCancel={() => {*/}
+            {/*        setActiveModal(null);*/}
+            {/*        setSelectedItem(null);*/}
+            {/*    }}*/}
+            {/*    footer={null}*/}
+            {/*    width={700}*/}
+            {/*>*/}
+            {/*    <Space direction="vertical" size="middle" style={{ width: '100%' }}>*/}
+            {/*        <NodeConditionForm onSubmit={handleAddCondition} />*/}
+            {/*        <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>*/}
+            {/*            <Title level={5}>Текущие условия</Title>*/}
+            {/*            {selectedItem?.conditions?.map((condition, index) => (*/}
+            {/*                <div key={index} style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>*/}
+            {/*                    <Typography.Text>*/}
+            {/*                        {condition.type === 'MAX_MAINTENANCE'*/}
+            {/*                            ? `Максимум на ТО: ${condition.maxUnderMaintenance}`*/}
+            {/*                            : `Количество работающих агрегатов: ${condition.requiredWorking}`}*/}
+            {/*                    </Typography.Text>*/}
+            {/*                </div>*/}
+            {/*            ))}*/}
+            {/*            {(!selectedItem?.conditions || selectedItem.conditions.length === 0) && (*/}
+            {/*                <Typography.Text type="secondary">Условия не заданы</Typography.Text>*/}
+            {/*            )}*/}
+            {/*        </div>*/}
+            {/*    </Space>*/}
+            {/*</Modal>*/}
+
             <Modal
                 title={`Условия: ${selectedItem?.name}`}
                 open={activeModal === 'conditions'}
@@ -1047,26 +1134,14 @@ const ProjectWorkspacePage = () => {
                     setSelectedItem(null);
                 }}
                 footer={null}
-                width={700}
+                width={800}
             >
-                <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                    <NodeConditionForm onSubmit={handleAddCondition} />
-                    <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>
-                        <Title level={5}>Текущие условия</Title>
-                        {selectedItem?.conditions?.map((condition, index) => (
-                            <div key={index} style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>
-                                <Typography.Text>
-                                    {condition.type === 'MAX_MAINTENANCE'
-                                        ? `Максимум на ТО: ${condition.maxUnderMaintenance}`
-                                        : `Количество работающих агрегатов: ${condition.requiredWorking}`}
-                                </Typography.Text>
-                            </div>
-                        ))}
-                        {(!selectedItem?.conditions || selectedItem.conditions.length === 0) && (
-                            <Typography.Text type="secondary">Условия не заданы</Typography.Text>
-                        )}
-                    </div>
-                </Space>
+                <NodeConditionForm
+                    onSubmit={handleAddCondition}
+                    onUpdate={handleUpdateCondition}
+                    onDelete={handleDeleteCondition}
+                    existingConditions={selectedItem?.conditions || []}
+                />
             </Modal>
 
             <Modal

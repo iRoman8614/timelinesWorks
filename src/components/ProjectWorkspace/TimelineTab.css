@@ -342,3 +342,63 @@
     justify-content: flex-end;
     gap: 8px;
 }
+
+/* Наработка - полное отображение без обрезания */
+.rt-timeline__element[id^="operating-hours"] {
+    overflow: visible !important;
+    z-index: 9999 !important;
+    padding: 0 !important;
+    min-width: 80px !important;
+}
+
+.rt-timeline__element[id^="operating-hours"] .rt-timeline__element-title {
+    overflow: visible !important;
+    white-space: nowrap !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    color: #000000 !important;
+    text-shadow: 0 0 3px white, 0 0 5px white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+}
+
+.rt-timeline__track {
+    overflow: visible !important;
+}
+
+/* Убираем padding и overflow для контейнера наработки */
+.rt-timeline__element[id^="operating-hours"] .rt-element__content,
+.rt-timeline__element[id^="operating-hours"] > div {
+    padding: 0 !important;
+    overflow: visible !important;
+}
+
+/* Убираем padding для самого элемента */
+.rt-timeline__element[id^="operating-hours"] {
+    overflow: visible !important;
+    z-index: 9999 !important;
+    padding: 0 !important;
+    min-width: 80px !important;
+}
+
+/* Убираем padding и overflow для title */
+.rt-timeline__element[id^="operating-hours"] .rt-timeline__element-title {
+    overflow: visible !important;
+    white-space: nowrap !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    color: #000000 !important;
+    text-shadow: 0 0 3px white, 0 0 5px white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+}
+
+.rt-timeline__track {
+    overflow: visible !important;
+}
+
+.rt-timeline__body {
+    overflow: visible !important;
+}

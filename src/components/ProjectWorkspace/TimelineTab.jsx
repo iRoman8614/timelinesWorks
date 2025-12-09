@@ -26,6 +26,8 @@ import {
 } from '@ant-design/icons';
 import MonthlyReportModal from './MonthlyReportModal';
 import DownloadTemplateModal from './DownloadTemplateModal';
+import NodeConstraintsForm from '../Forms/NodeConstraintsForm';
+import OperatingHoursDisplay from './OperatingHoursDisplay';
 
 const DATE_FORMAT = 'YYYY-MM-DD';
 const ASSIGNMENT_DATETIME_FORMAT = 'YYYY-MM-DDTHH:mm:ss';
@@ -39,7 +41,6 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     const [forceRenderKey, setForceRenderKey] = useState(0);
     const [selectedElement, setSelectedElement] = useState(null);
     const [isMonthlyReportModalVisible, setIsMonthlyReportModalVisible] = useState(false);
-
     const [planName, setPlanName] = useState('');
     const [isSavingPlan, setIsSavingPlan] = useState(false);
     const [planFormStartDate, setPlanFormStartDate] = useState(() =>
@@ -59,6 +60,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
     const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
     const [isDownloadTemplateModalVisible, setIsDownloadTemplateModalVisible] = useState(false);
     const [isUploadingHistory, setIsUploadingHistory] = useState(false);
+    const [operatingHoursDates, setOperatingHoursDates] = useState([]);
 
     const [currentTimeline, setCurrentTimeline] = useState({});
     const [isProjectTimeline, setIsProjectTimeline] = useState(true);
@@ -110,6 +112,19 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
         setForceRenderKey(k => k + 1);
     }, [setSearchParams]);
 
+    const handleAddOperatingHoursDate = useCallback((dateData) => {
+        setOperatingHoursDates(prev => [...prev, dateData]);
+    }, []);
+
+    // Удаление конкретной даты
+    const handleRemoveOperatingHoursDate = useCallback((dateStr) => {
+        setOperatingHoursDates(prev => prev.filter(d => d.date !== dateStr));
+    }, []);
+
+    // Очистка всех дат
+    const handleClearAllOperatingHours = useCallback(() => {
+        setOperatingHoursDates([]);
+    }, []);
 
     // const timeline = project?.timeline || {};
     // const currentTimeline = selectedPlan?.timeline || project?.timeline || {};
@@ -242,6 +257,42 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
     const customElementRenderer = useCallback(
         ({ element, ...props }) => {
+
+            if (element.meta?.kind === 'operatingHours') {
+                return (
+                    <div
+                        style={{
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            overflow: 'visible',
+                            zIndex: 9999,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            padding: 0
+                        }}
+                    >
+                    <span
+                        data-title={element.dataTitle}
+                        style={{
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            color: '#000000',
+                            textShadow: '0 0 3px white, 0 0 5px white',
+                            whiteSpace: 'nowrap',
+                            overflow: 'visible',
+                            cursor: 'default',
+                            display: 'inline-block'
+                        }}
+                    >
+                        {element.title}
+                    </span>
+                    </div>
+                );
+            }
+
+
+
             const handleDoubleClick = (e) => {
                 e.stopPropagation();
 
@@ -799,6 +850,40 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                                 });
                             }
                         });
+
+                        // Добавление маркеров наработки
+                        operatingHoursDates.forEach(dateData => {
+                            const operatingHoursData = dateData.data.find(
+                                oh => oh.unitId === unit.id
+                            );
+
+                            if (operatingHoursData) {
+                                const markerDate = new Date(dateData.date);
+                                const markerEnd = new Date(markerDate.getTime() + 60 * 60 * 1000);
+
+                                componentTrack.elements.push({
+                                    id: `operating-hours-${unit.id}-${dateData.date}`,
+                                    title: `${operatingHoursData.operatingHours}`,
+                                    dataTitle: `Наработка на ${dateData.displayDate}: ${operatingHoursData.operatingHours} часов`,
+                                    start: markerDate,
+                                    end: new Date(markerDate.getTime() + 24 * 60 * 60 * 1000), // 1 час
+                                    style: {
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        color: 'black',
+                                        fontSize: '10px',
+                                        overflow: 'visible',
+                                        zIndex: 9999
+                                    },
+                                    meta: {
+                                        kind: 'operatingHours',
+                                        unitId: unit.id,
+                                        date: dateData.date,
+                                        hours: operatingHoursData.operatingHours
+                                    }
+                                });
+                            }
+                        });
                     }
                 });
 
@@ -895,7 +980,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
         });
 
         return allTracks;
-    }, [project, timeline, openTracks, timelineEndKey, getMaintenanceType, getUnitById, assemblyTypeMap]);
+    }, [project, timeline, openTracks, timelineEndKey, operatingHoursDates, getMaintenanceType, getUnitById, assemblyTypeMap]);
 
     const timebar = useMemo(() => {
         const startDate = timelineStartDate;
@@ -951,6 +1036,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
 
         return timebars;
     }, [timelineStartDate, timelineEndDate]);
+
     const now = useMemo(() => new Date(), []);
 
     const handleAssignmentSubmit = useCallback((values) => {
@@ -1273,95 +1359,18 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             );
         }
 
+        if (meta.kind === 'operatingHours') {
+            return (
+                <div style={{position: 'relative', width: 'fit-content', zIndex: '10000'}}>
+                    <p>{meta.hours}</p>
+                </div>
+            );
+        }
+
         return null;
     };
 
-
-    // const handleDeleteSelectedElement = useCallback(
-    //     () => {
-    //         if (!activePlan || isProjectTimeline) {
-    //             message.error('Удаление возможно только для выбранного плана');
-    //             return;
-    //         }
-    //
-    //         if (!selectedElement || !selectedElement.meta) {
-    //             return;
-    //         }
-    //
-    //         if (!selectedElement || !project || !onProjectUpdate) return;
-    //         const meta = selectedElement.meta;
-    //         if (!meta) return;
-    //
-    //         try {
-    //             let updatedTimeline = { ...(project.timeline || {}) };
-    //
-    //             if (meta.kind === 'unitAssignment' && meta.assignment) {
-    //                 const prev = updatedTimeline.unitAssignments || [];
-    //                 updatedTimeline = {
-    //                     ...updatedTimeline,
-    //                     unitAssignments: prev.filter((a) => {
-    //                         // Сравниваем по полям, а не по ссылке
-    //                         return !(
-    //                             a.unitId === meta.assignment.unitId &&
-    //                             a.componentOfAssembly?.assemblyId === meta.assignment.componentOfAssembly?.assemblyId &&
-    //                             a.dateTime === meta.assignment.dateTime
-    //                         );
-    //                     }),
-    //                 };
-    //             }
-    //
-    //             if (meta.kind === 'maintenanceEvent' && meta.event) {
-    //                 const prev = updatedTimeline.maintenanceEvents || [];
-    //                 updatedTimeline = {
-    //                     ...updatedTimeline,
-    //                     maintenanceEvents: prev.filter((e) => {
-    //                         // Сравниваем по полям
-    //                         return !(
-    //                             e.maintenanceTypeId === meta.event.maintenanceTypeId &&
-    //                             e.unitId === meta.event.unitId &&
-    //                             e.dateTime === meta.event.dateTime
-    //                         );
-    //                     }),
-    //                 };
-    //             }
-    //
-    //             if (meta.kind === 'assemblyState' && meta.state) {
-    //                 const prev = updatedTimeline.assemblyStates || [];
-    //                 updatedTimeline = {
-    //                     ...updatedTimeline,
-    //                     assemblyStates: prev.filter((s) => {
-    //                         // Сравниваем по полям
-    //                         return !(
-    //                             s.assemblyId === meta.state.assemblyId &&
-    //                             s.type === meta.state.type &&
-    //                             s.dateTime === meta.state.dateTime
-    //                         );
-    //                     }),
-    //                 };
-    //             }
-    //
-    //             const updatedProject = {
-    //                 ...project,
-    //                 timeline: updatedTimeline,
-    //             };
-    //
-    //             // Обновляем только локальный state, без сохранения на сервер
-    //             // Сохранение произойдет по кнопке "Сохранить" в хедере
-    //             onProjectUpdate(updatedProject);
-    //             message.success('Элемент удалён (не забудьте сохранить)');
-    //
-    //             setSelectedElement(null);
-    //             setForceRenderKey((k) => k + 1);
-    //         } catch (err) {
-    //             console.error('Ошибка при удалении элемента таймлайна', err);
-    //             message.error('Не удалось удалить элемент');
-    //         }
-    //     },
-    //     [selectedElement, project, onProjectUpdate]
-    // );
-
     const handleDeleteSelectedElement = useCallback(() => {
-        // ✅ ДОБАВИТЬ ПРОВЕРКУ В НАЧАЛО
         if (!activePlan || isProjectTimeline) {
             message.error('Удаление возможно только для выбранного плана');
             return;
@@ -2004,6 +2013,20 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
             {/*        </Space>*/}
             {/*    </Card>*/}
             {/*)}*/}
+
+            <NodeConstraintsForm
+                project={project}
+                onProjectUpdate={onProjectUpdate}
+            />
+
+            <OperatingHoursDisplay
+                projectId={project?.id}
+                activePlanId={activePlan?.id}
+                activeDates={operatingHoursDates}
+                onAddDate={handleAddOperatingHoursDate}
+                onRemoveDate={handleRemoveOperatingHoursDate}
+                onClearAll={handleClearAllOperatingHours}
+            />
 
             <Card className="timeline-chart" key={`timeline-card-${forceRenderKey}`}>
                 {hasTimelineData ? (
