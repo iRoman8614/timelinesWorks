@@ -68,13 +68,6 @@ const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance, on
             ellipsis: true
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            width: 280,
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
             title: (record) => deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             width: 280,
@@ -145,7 +138,7 @@ const PartModelsTable = ({ partModels, onEdit, onDelete, onManageMaintenance, on
             columns={columns}
             dataSource={partModels}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
         />
     );

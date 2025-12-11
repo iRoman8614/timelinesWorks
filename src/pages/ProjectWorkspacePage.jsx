@@ -63,18 +63,6 @@ const ProjectWorkspacePage = () => {
         loadProject();
     }, [projectId]);
 
-    // const saveProject = () => {
-    //     dataService.saveProject(projectId, project)
-    //         .then(() => {
-    //             message.success('Проект сохранен');
-    //             setHasUnsavedChanges(false);
-    //         })
-    //         .catch(error => {
-    //             console.error('Error saving project:', error);
-    //             message.error('Ошибка сохранения проекта');
-    //         });
-    // };
-
     const saveProject = async () => {
         try {
             const saved = await serverProjectsApi.save(project);
@@ -158,6 +146,32 @@ const ProjectWorkspacePage = () => {
         setSelectedItem(updated.assemblyTypes.find(at => at.id === selectedItem.id));
     };
 
+    const handleEditComponent = (record) => {
+        setEditingItem(record);
+        setActiveModal('editComponent');
+    };
+
+    const handleUpdateComponent = (data) => {
+        const updated = {
+            ...project,
+            assemblyTypes: project.assemblyTypes.map(at =>
+                at.id === selectedItem.id
+                    ? {
+                        ...at,
+                        components: at.components.map(c =>
+                            c.id === editingItem.id ? { ...c, ...data } : c
+                        )
+                    }
+                    : at
+            )
+        };
+        updateProject(updated);
+        setSelectedItem(updated.assemblyTypes.find(at => at.id === selectedItem.id));
+        setActiveModal(null);
+        setEditingItem(null);
+        message.success(`Компонент "${data.name}" обновлен`);
+    };
+
     const handleAddPartModel = (data) => {
         const partModelWithUnits = {
             ...data,
@@ -189,6 +203,11 @@ const ProjectWorkspacePage = () => {
     const handleManageUnits = (partModel) => {
         setSelectedItem(partModel);
         setActiveModal('units');
+    };
+
+    const handleEditPartModel = (record) => {
+        setEditingItem(record);
+        setActiveModal('editPartModel');
     };
 
     const handleAddUnit = (data) => {
@@ -224,6 +243,32 @@ const ProjectWorkspacePage = () => {
         message.success(`Деталь "${unit.name}" удалена`);
     };
 
+    const handleEditUnit = (record) => {
+        setEditingItem(record);
+        setActiveModal('editUnit');
+    };
+
+    const handleUpdateUnit = (data) => {
+        const updated = {
+            ...project,
+            partModels: project.partModels.map(pm =>
+                pm.id === selectedItem.id
+                    ? {
+                        ...pm,
+                        units: (pm.units || []).map(u =>
+                            u.id === editingItem.id ? { ...u, ...data } : u
+                        )
+                    }
+                    : pm
+            )
+        };
+        updateProject(updated);
+        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
+        setActiveModal(null);
+        setEditingItem(null);
+        message.success(`Деталь "${data.name}" обновлена`);
+    };
+
     const handleAddMaintenanceType = (data) => {
         const updated = {
             ...project,
@@ -241,6 +286,39 @@ const ProjectWorkspacePage = () => {
         setEditingItem(record);
         setActiveModal('editMaintenanceType');
     }
+
+    const handleUpdateMaintenanceType = (data) => {
+        // Рекурсивная функция для обновления типа ТО в иерархии
+        const updateMaintenanceTypeInTree = (types, updatedType) => {
+            return types.map(type => {
+                if (type.id === updatedType.id) {
+                    // Обновляем тип, сохраняя дочерние элементы
+                    return { ...updatedType, children: type.children || [] };
+                }
+                if (type.children && type.children.length > 0) {
+                    return {
+                        ...type,
+                        children: updateMaintenanceTypeInTree(type.children, updatedType)
+                    };
+                }
+                return type;
+            });
+        };
+
+        const updated = {
+            ...project,
+            partModels: project.partModels.map(pm =>
+                pm.id === selectedItem.id
+                    ? { ...pm, maintenanceTypes: updateMaintenanceTypeInTree(pm.maintenanceTypes, data) }
+                    : pm
+            )
+        };
+        updateProject(updated);
+        setSelectedItem(updated.partModels.find(pm => pm.id === selectedItem.id));
+        setActiveModal(null);
+        setEditingItem(null);
+        message.success(`Тип ТО "${data.name}" обновлен`);
+    };
 
     const handleDeleteMaintenanceType = (maintenanceType) => {
         const updated = {
@@ -324,6 +402,15 @@ const ProjectWorkspacePage = () => {
     const handleEditNode = (node) => {
         setEditingItem(node);
         setActiveModal('editNode');
+    };
+
+    const handleNodesReorder = (newNodes) => {
+        const updated = {
+            ...project,
+            nodes: newNodes
+        };
+        updateProject(updated);
+        message.success('Структура узлов изменена');
     };
 
     const handleAddCondition = (data) => {
@@ -589,7 +676,7 @@ const ProjectWorkspacePage = () => {
                         >
                             <PartModelsTable
                                 partModels={project.partModels}
-                                onEdit={(record) => console.log('Edit', record)}
+                                onEdit={handleEditPartModel}
                                 onDelete={handleDeletePartModel}
                                 onManageMaintenance={handleManageMaintenance}
                                 onManageUnits={handleManageUnits}
@@ -623,6 +710,7 @@ const ProjectWorkspacePage = () => {
                                 onDelete={handleDeleteNode}
                                 onAddChild={handleAddChildClick}
                                 onManageConditions={handleManageConditions}
+                                onNodesReorder={handleNodesReorder}
                                 assemblyTypes={project.assemblyTypes}
                             />
                         </Panel>
@@ -938,10 +1026,28 @@ const ProjectWorkspacePage = () => {
                     />
                     <ComponentsTable
                         components={selectedItem?.components || []}
+                        onEdit={handleEditComponent}
                         onDelete={handleDeleteComponentFromAssemblyType}
                         componentTypes={project.componentTypes}
                     />
                 </Space>
+            </Modal>
+
+            <Modal
+                title="Редактировать компонент"
+                open={activeModal === 'editComponent'}
+                onCancel={() => {
+                    setActiveModal(null);
+                    setEditingItem(null);
+                }}
+                footer={null}
+                width={600}
+            >
+                <ComponentForm
+                    initialValues={editingItem}
+                    componentTypes={project.componentTypes}
+                    onSubmit={handleUpdateComponent}
+                />
             </Modal>
 
             <Modal
@@ -955,7 +1061,10 @@ const ProjectWorkspacePage = () => {
                 width={1000}
             >
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                    <MaintenanceTypeForm onSubmit={handleAddMaintenanceType} />
+                    <MaintenanceTypeForm
+                        onSubmit={handleAddMaintenanceType}
+                        allMaintenanceTypes={selectedItem?.maintenanceTypes || []}
+                    />
                     <MaintenanceTypesTable
                         maintenanceTypes={selectedItem?.maintenanceTypes || []}
                         onEdit={handleEditMaintenanceType}
@@ -982,14 +1091,28 @@ const ProjectWorkspacePage = () => {
                     />
                     <UnitsTable
                         units={selectedItem?.units || []}
-                        onEdit={(record) => {
-                            setEditingItem(record);
-                            setActiveModal('editPartModel');
-                        }}
+                        onEdit={handleEditUnit}
                         onDelete={handleDeleteUnit}
                         partModels={project.partModels}
                     />
                 </Space>
+            </Modal>
+
+            <Modal
+                title="Редактировать деталь"
+                open={activeModal === 'editUnit'}
+                onCancel={() => {
+                    setActiveModal(null);
+                    setEditingItem(null);
+                }}
+                footer={null}
+                width={600}
+            >
+                <UnitForm
+                    initialValues={editingItem}
+                    partModels={project.partModels}
+                    onSubmit={handleUpdateUnit}
+                />
             </Modal>
 
             <Modal
@@ -1047,7 +1170,12 @@ const ProjectWorkspacePage = () => {
                             ...project,
                             partModels: project.partModels.map(pm =>
                                 pm.id === editingItem.id
-                                    ? { ...pm, ...data }
+                                    ? {
+                                        ...pm,
+                                        ...data,
+                                        maintenanceTypes: pm.maintenanceTypes || [],
+                                        units: pm.units || []
+                                    }
                                     : pm
                             )
                         };
@@ -1154,6 +1282,23 @@ const ProjectWorkspacePage = () => {
                 <AssignUnitForm
                     project={project}
                     onSubmit={handleAssignUnit}
+                />
+            </Modal>
+
+            <Modal
+                title="Редактировать тип ТО"
+                open={activeModal === 'editMaintenanceType'}
+                onCancel={() => {
+                    setActiveModal(null);
+                    setEditingItem(null);
+                }}
+                footer={null}
+                width={600}
+            >
+                <MaintenanceTypeForm
+                    initialValues={editingItem}
+                    allMaintenanceTypes={selectedItem?.maintenanceTypes || []}
+                    onSubmit={handleUpdateMaintenanceType}
                 />
             </Modal>
 

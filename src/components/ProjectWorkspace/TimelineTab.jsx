@@ -2104,6 +2104,7 @@ const TimelineTab = ({ project, onProjectUpdate, onOpenAssignUnit, onOpenAddMain
                 project={project}
                 planId={activePlan?.id || null}
                 onGenerate={handleGenerateMonthlyReport}
+                activePlan={activePlan}
             />
         </div>
     );

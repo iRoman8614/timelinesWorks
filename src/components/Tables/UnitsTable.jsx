@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Tag, Typography } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
 const UnitsTable = ({ units, onEdit, onDelete, partModels = [] }) => {
+    const [deletingId, setDeletingId] = useState(null);
+
+    const handleDeleteClick = (record) => {
+        setDeletingId(record.id);
+    };
+
+    const handleConfirmDelete = (record) => {
+        onDelete(record);
+        setDeletingId(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeletingId(null);
+    };
+
     const getPartModelName = (partModelId) => {
         const model = partModels.find(m => m.id === partModelId);
         return model ? model.name : 'Не указана';
@@ -43,31 +58,49 @@ const UnitsTable = ({ units, onEdit, onDelete, partModels = [] }) => {
             render: (text) => text || <Text type="secondary">-</Text>
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            width: 280,
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
-            title: 'Действия',
+            title: deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             width: 150,
-            render: (_, record) => (
-                <Space size="small">
-                    <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => onEdit(record)}
-                    />
-                    <Button
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => onDelete(record)}
-                    />
-                </Space>
-            )
+            render: (_, record) => {
+                if (deletingId === record.id) {
+                    return (
+                        <Space size="small">
+                            <Button
+                                size="small"
+                                type="primary"
+                                danger
+                                icon={<CheckOutlined />}
+                                onClick={() => handleConfirmDelete(record)}
+                            >
+                                Да
+                            </Button>
+                            <Button
+                                size="small"
+                                icon={<CloseOutlined />}
+                                onClick={handleCancelDelete}
+                            >
+                                Нет
+                            </Button>
+                        </Space>
+                    );
+                }
+
+                return (
+                    <Space size="small">
+                        <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => onEdit(record)}
+                        />
+                        <Button
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteClick(record)}
+                        />
+                    </Space>
+                );
+            }
         }
     ];
 
@@ -76,7 +109,7 @@ const UnitsTable = ({ units, onEdit, onDelete, partModels = [] }) => {
             columns={columns}
             dataSource={units}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
         />
     );

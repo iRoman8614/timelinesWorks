@@ -87,9 +87,9 @@ const NodeConditionForm = ({ onSubmit, onUpdate, onDelete, existingConditions = 
                         placeholder="Выберите тип условия"
                         onChange={handleTypeChange}
                     >
-                        {/*<Select.Option value="MAX_MAINTENANCE">*/}
-                        {/*    Максимум агрегатов на ТО*/}
-                        {/*</Select.Option>*/}
+                        <Select.Option value="MAX_MAINTENANCE">
+                            Максимум агрегатов на ТО
+                        </Select.Option>
                         <Select.Option value="REQUIRED_WORKING">
                             Число работающих агрегатов
                         </Select.Option>

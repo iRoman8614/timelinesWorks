@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Table, Button, Space, Tag, Typography, Tooltip } from 'antd';
 import {
+    EditOutlined,
     DeleteOutlined,
     CheckOutlined,
     CloseOutlined,
@@ -9,7 +10,7 @@ import {
 
 const { Text } = Typography;
 
-const MaintenanceTypesTable = ({ maintenanceTypes, onDelete }) => {
+const MaintenanceTypesTable = ({ maintenanceTypes, onEdit, onDelete }) => {
     const [deletingId, setDeletingId] = useState(null);
 
     const handleDeleteClick = (record) => {
@@ -156,17 +157,10 @@ const MaintenanceTypesTable = ({ maintenanceTypes, onDelete }) => {
             )
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            width: 280,
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
             title: deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             align: 'center',
-            width: 150,
+            width: 180,
             fixed: 'right',
             render: (_, record) => {
                 if (deletingId === record.id) {
@@ -196,6 +190,12 @@ const MaintenanceTypesTable = ({ maintenanceTypes, onDelete }) => {
 
                 return (
                     <Space size="small">
+                        <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => onEdit(record)}
+                            title="Редактировать"
+                        />
                         <Tooltip title={hasChildren ? 'Сначала удалите дочерние типы ТО' : 'Удалить'}>
                             <Button
                                 size="small"
@@ -219,7 +219,7 @@ const MaintenanceTypesTable = ({ maintenanceTypes, onDelete }) => {
             dataSource={dataSource}
             pagination={false}
             size="small"
-            scroll={{ x: 1400 }}
+            scroll={{ x: 1500 }}
             rowClassName={(record) =>
                 record.level > 0 ? 'nested-row' : 'root-row'
             }

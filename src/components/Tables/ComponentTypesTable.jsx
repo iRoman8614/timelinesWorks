@@ -34,12 +34,6 @@ const ComponentTypesTable = ({ componentTypes, onEdit, onDelete }) => {
             ellipsis: true
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
             title: (record) => deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             width: 150,
@@ -91,7 +85,7 @@ const ComponentTypesTable = ({ componentTypes, onEdit, onDelete }) => {
             columns={columns}
             dataSource={componentTypes}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
             locale={{
                 emptyText: 'Нет данных'

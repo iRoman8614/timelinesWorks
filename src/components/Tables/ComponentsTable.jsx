@@ -1,6 +1,6 @@
-import React, {useState} from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Tag, Typography } from 'antd';
-import {DeleteOutlined, CheckOutlined, CloseOutlined} from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -45,14 +45,9 @@ const ComponentsTable = ({ components, onEdit, onDelete, componentTypes = [] }) 
             ellipsis: true
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
-            title: (record) => deletingId ? 'Удалить?' : 'Действия',
+            title: deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
+            width: 150,
             align: 'center',
             render: (_, record) => {
                 if (deletingId === record.id) {
@@ -82,6 +77,11 @@ const ComponentsTable = ({ components, onEdit, onDelete, componentTypes = [] }) 
                     <Space size="small">
                         <Button
                             size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => onEdit(record)}
+                        />
+                        <Button
+                            size="small"
                             danger
                             icon={<DeleteOutlined />}
                             onClick={() => handleDeleteClick(record)}
@@ -97,7 +97,7 @@ const ComponentsTable = ({ components, onEdit, onDelete, componentTypes = [] }) 
             columns={columns}
             dataSource={components}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
         />
     );

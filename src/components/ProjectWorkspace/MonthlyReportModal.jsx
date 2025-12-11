@@ -1,5 +1,5 @@
 import React, {useState, useMemo, useCallback} from 'react';
-import { Modal, DatePicker, Row, Col, Checkbox, Button, message, Typography } from 'antd';
+import { Modal, DatePicker, Row, Col, Checkbox, Button, message, Typography, Alert } from 'antd';
 import { FileExcelOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -13,14 +13,19 @@ const { Title } = Typography;
  * @param {Function} props.onClose - Callback для закрытия
  * @param {Object} props.project - Текущий проект
  * @param {string|null} props.planId - ID активного плана (null для исторического таймлайна)
+ * @param {Object} props.activePlan - Активный план с датами startTime и endTime
  * @param {Function} props.onGenerate - Callback для генерации отчета
  */
-const MonthlyReportModal = ({ visible, onClose, project, planId, onGenerate }) => {
+const MonthlyReportModal = ({ visible, onClose, project, planId, activePlan, onGenerate }) => {
     const [startDate, setStartDate] = useState(dayjs().startOf('month'));
     const [endDate, setEndDate] = useState(dayjs().endOf('month'));
     const [selectedAssemblies, setSelectedAssemblies] = useState([]);
     const [selectedComponents, setSelectedComponents] = useState([]);
     const [isGenerating, setIsGenerating] = useState(false);
+
+    // Получаем даты плана
+    const planStartDate = activePlan?.startTime ? dayjs(activePlan.startTime) : null;
+    const planEndDate = activePlan?.endTime ? dayjs(activePlan.endTime) : null;
 
     // Извлекаем все assembly из структуры проекта
     const assemblies = useMemo(() => {
@@ -143,6 +148,18 @@ const MonthlyReportModal = ({ visible, onClose, project, planId, onGenerate }) =
             return;
         }
 
+        if (planStartDate && planEndDate) {
+            if (startDate.isBefore(planStartDate, 'day')) {
+                message.error(`Дата начала отчета не может быть раньше даты начала плана (${planStartDate.format('DD.MM.YYYY')})`);
+                return;
+            }
+
+            if (endDate.isAfter(planEndDate, 'day')) {
+                message.error(`Дата окончания отчета не может быть позже даты окончания плана (${planEndDate.format('DD.MM.YYYY')})`);
+                return;
+            }
+        }
+
         if (selectedAssemblies.length === 0) {
             message.warning('Выберите хотя бы один агрегат');
             return;
@@ -216,6 +233,16 @@ const MonthlyReportModal = ({ visible, onClose, project, planId, onGenerate }) =
                 </Button>
             ]}
         >
+            {/*{planStartDate && planEndDate && (*/}
+            {/*    <Alert*/}
+            {/*        message="Диапазон дат плана"*/}
+            {/*        description={`Период действия плана: ${planStartDate.format('DD.MM.YYYY')} - ${planEndDate.format('DD.MM.YYYY')}`}*/}
+            {/*        type="info"*/}
+            {/*        showIcon*/}
+            {/*        style={{ marginBottom: 16 }}*/}
+            {/*    />*/}
+            {/*)}*/}
+
             {/* Даты */}
             <Row gutter={16} style={{ marginBottom: 24 }}>
                 <Col span={12}>
@@ -226,6 +253,16 @@ const MonthlyReportModal = ({ visible, onClose, project, planId, onGenerate }) =
                         format="YYYY-MM-DD"
                         style={{ width: '100%', marginTop: 8 }}
                         placeholder="Выберите дату начала"
+                        disabledDate={(current) => {
+                            if (!current) return false;
+                            if (planStartDate && current.isBefore(planStartDate, 'day')) {
+                                return true;
+                            }
+                            if (planEndDate && current.isAfter(planEndDate, 'day')) {
+                                return true;
+                            }
+                            return false;
+                        }}
                     />
                 </Col>
                 <Col span={12}>
@@ -237,8 +274,17 @@ const MonthlyReportModal = ({ visible, onClose, project, planId, onGenerate }) =
                         style={{ width: '100%', marginTop: 8 }}
                         placeholder="Выберите дату окончания"
                         disabledDate={(current) => {
-                            if (!startDate) return false;
-                            return current && current.isBefore(startDate, 'day');
+                            if (!current) return false;
+                            if (startDate && current.isBefore(startDate, 'day')) {
+                                return true;
+                            }
+                            if (planStartDate && current.isBefore(planStartDate, 'day')) {
+                                return true;
+                            }
+                            if (planEndDate && current.isAfter(planEndDate, 'day')) {
+                                return true;
+                            }
+                            return false;
                         }}
                     />
                 </Col>

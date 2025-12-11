@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Table, Button, Space, Tag, Typography } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
 const AssembliesTable = ({ assemblies, onEdit, onDelete, assemblyTypes = [] }) => {
+    const [deletingId, setDeletingId] = useState(null);
+
+    const handleDeleteClick = (record) => {
+        setDeletingId(record.id);
+    };
+
+    const handleConfirmDelete = (record) => {
+        onDelete(record);
+        setDeletingId(null);
+    };
+
+    const handleCancelDelete = () => {
+        setDeletingId(null);
+    };
+
     const getTypeName = (typeId) => {
         const type = assemblyTypes.find(t => t.id === typeId);
         return type ? type.name : 'Не указан';
@@ -30,31 +45,49 @@ const AssembliesTable = ({ assemblies, onEdit, onDelete, assemblyTypes = [] }) =
             ellipsis: true
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            width: 280,
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
-            title: 'Действия',
+            title: deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             width: 150,
-            render: (_, record) => (
-                <Space size="small">
-                    <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={() => onEdit(record)}
-                    />
-                    <Button
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => onDelete(record)}
-                    />
-                </Space>
-            )
+            render: (_, record) => {
+                if (deletingId === record.id) {
+                    return (
+                        <Space size="small">
+                            <Button
+                                size="small"
+                                type="primary"
+                                danger
+                                icon={<CheckOutlined />}
+                                onClick={() => handleConfirmDelete(record)}
+                            >
+                                Да
+                            </Button>
+                            <Button
+                                size="small"
+                                icon={<CloseOutlined />}
+                                onClick={handleCancelDelete}
+                            >
+                                Нет
+                            </Button>
+                        </Space>
+                    );
+                }
+
+                return (
+                    <Space size="small">
+                        <Button
+                            size="small"
+                            icon={<EditOutlined />}
+                            onClick={() => onEdit(record)}
+                        />
+                        <Button
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleDeleteClick(record)}
+                        />
+                    </Space>
+                );
+            }
         }
     ];
 
@@ -63,7 +96,7 @@ const AssembliesTable = ({ assemblies, onEdit, onDelete, assemblyTypes = [] }) =
             columns={columns}
             dataSource={assemblies}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
         />
     );

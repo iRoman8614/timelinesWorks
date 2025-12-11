@@ -65,9 +65,9 @@ const NodeConstraintsForm = ({
             type: values.type
         };
 
-        // if (values.type === 'MAX_MAINTENANCE') {
-        //     newCondition.maxUnderMaintenance = values.value;
-        // } else
+        if (values.type === 'MAX_MAINTENANCE') {
+            newCondition.maxUnderMaintenance = values.value;
+        } else
             if (values.type === 'REQUIRED_WORKING') {
             newCondition.requiredWorking = values.value;
         }
@@ -183,9 +183,9 @@ const NodeConstraintsForm = ({
         setEditingIndex(localIndex);
 
         let value;
-        // if (condition.type === 'MAX_MAINTENANCE') {
-        //     value = condition.maxUnderMaintenance;
-        // } else
+        if (condition.type === 'MAX_MAINTENANCE') {
+            value = condition.maxUnderMaintenance;
+        } else
         if (condition.type === 'REQUIRED_WORKING') {
             value = condition.requiredWorking;
         }
@@ -207,7 +207,7 @@ const NodeConstraintsForm = ({
 
     const getConstraintTypeLabel = (type) => {
         const labels = {
-            // 'MAX_MAINTENANCE': 'Максимум на ТО',
+            'MAX_MAINTENANCE': 'Максимум на ТО',
             'REQUIRED_WORKING': 'Число работающих'
         };
         return labels[type] || type;
@@ -216,9 +216,9 @@ const NodeConstraintsForm = ({
     const getConstraintText = (constraint) => {
         const typeLabel = getConstraintTypeLabel(constraint.condition.type);
         let value;
-        // if (constraint.condition.type === 'MAX_MAINTENANCE') {
-        //     value = constraint.condition.maxUnderMaintenance;
-        // } else
+        if (constraint.condition.type === 'MAX_MAINTENANCE') {
+            value = constraint.condition.maxUnderMaintenance;
+        } else
         if (constraint.condition.type === 'REQUIRED_WORKING') {
             value = constraint.condition.requiredWorking;
         }
@@ -273,9 +273,9 @@ const NodeConstraintsForm = ({
                             placeholder="Выберите тип"
                             onChange={handleTypeChange}
                         >
-                            {/*<Select.Option value="MAX_MAINTENANCE">*/}
-                            {/*    Максимум на ТО*/}
-                            {/*</Select.Option>*/}
+                            <Select.Option value="MAX_MAINTENANCE">
+                                Максимум на ТО
+                            </Select.Option>
                             <Select.Option value="REQUIRED_WORKING">
                                 Минимум работающих
                             </Select.Option>

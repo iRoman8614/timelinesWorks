@@ -15,6 +15,7 @@ const OperatingHoursDisplay = ({
                                    onRemoveDate,
                                    onClearAll,
                                    apiBaseUrl = '/optimizer/api'
+                                   //apiBaseUrl = '/api'
                                }) => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [isLoading, setIsLoading] = useState(false);

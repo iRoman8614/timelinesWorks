@@ -44,12 +44,6 @@ const AssemblyTypesTable = ({ assemblyTypes, onEdit, onDelete, onManageComponent
             )
         },
         {
-            title: 'UUID',
-            dataIndex: 'id',
-            key: 'id',
-            render: (id) => <Text code copyable>{id}</Text>
-        },
-        {
             title: (record) => deletingId ? 'Удалить?' : 'Действия',
             key: 'actions',
             width: 240,
@@ -108,7 +102,7 @@ const AssemblyTypesTable = ({ assemblyTypes, onEdit, onDelete, onManageComponent
             columns={columns}
             dataSource={assemblyTypes}
             rowKey="id"
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             size="small"
         />
     );
