@@ -4,6 +4,7 @@ import { Button, Spin, Tabs } from 'antd';
 import { ArrowLeftOutlined, SettingOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useProjects } from '../../hooks/useProjectContext';
 import ConfigBlock from '../../components/ConfigBlock';
+import TimelineBlock from '../../components/TimelineBlock';
 import './ProjectEditor.css';
 
 const { TabPane } = Tabs;
@@ -111,10 +112,7 @@ const ProjectEditor = () => {
                         key="timeline"
                     >
                         <div className="timeline-tab">
-                            <div style={{ padding: 24, textAlign: 'center', color: '#8c8c8c' }}>
-                                <h2>Timeline</h2>
-                                <p>Здесь будет визуализация временной шкалы событий (Этап 3)</p>
-                            </div>
+                            <TimelineBlock project={selectedProject} />
                         </div>
                     </TabPane>
 

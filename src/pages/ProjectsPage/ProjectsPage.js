@@ -38,7 +38,7 @@ const ProjectsPage = () => {
                 }}
             >
                 <div className="root-drop-zone-item-content">
-                    📁 Переместить в корень
+                    Вынсти из папок
                 </div>
             </div>
         );
