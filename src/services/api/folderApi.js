@@ -1,4 +1,5 @@
 import axiosInstance from './axiosConfig';
+import { generateUUID } from '../../utils/uuidUtils';
 
 /**
  * API для работы с папками
@@ -32,7 +33,12 @@ const folderApi = {
      * @returns {Promise<Object>}
      */
     create: async (folderData) => {
-        const response = await axiosInstance.post('/api/folders', folderData);
+        const dataWithId = {
+            id: generateUUID(),
+            ...folderData,
+        };
+        console.log('Creating folder with data:', dataWithId);
+        const response = await axiosInstance.post('/api/folders', dataWithId);
         return response.data;
     },
 

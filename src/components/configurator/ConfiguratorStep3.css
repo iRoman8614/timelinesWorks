@@ -1,0 +1,36 @@
+.part-model-form,
+.maintenance-type-form,
+.unit-form,
+.part-model-table {
+    background: #fafafa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    overflow: scroll;
+}
+
+.part-model-form h3,
+.maintenance-type-form h3,
+.unit-form h3,
+.part-model-table h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    flex-shrink: 0;
+}
+
+.part-model-table .ant-table-wrapper {
+    flex: 1;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column;
+}
+
+.part-model-table .ant-table {
+    flex: 1;
+}

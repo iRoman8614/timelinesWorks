@@ -1,4 +1,5 @@
 import axiosInstance from './axiosConfig';
+import { generateUUID } from '../../utils/uuidUtils';
 
 /**
  * API для работы с проектами
@@ -33,7 +34,13 @@ const projectApi = {
      * @returns {Promise<Object>}
      */
     create: async (projectData) => {
-        const response = await axiosInstance.post('/api/projects', projectData);
+        const dataWithDefaults = {
+            id: generateUUID(),
+            structure: '', // Пустая структура по умолчанию
+            ...projectData,
+        };
+        console.log('Creating project with data:', dataWithDefaults);
+        const response = await axiosInstance.post('/api/projects', dataWithDefaults);
         return response.data;
     },
 

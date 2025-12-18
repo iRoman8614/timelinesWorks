@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { message } from 'antd';
 import folderApi from '../services/api/folderApi';
 import projectApi from '../services/api/projectApi';
-import { buildTree } from '../utils/treeUtils';
 
 const ProjectContext = createContext(null);
 
@@ -17,35 +16,42 @@ export const useProjects = () => {
 export const ProjectProvider = ({ children }) => {
     const [folders, setFolders] = useState([]);
     const [projects, setProjects] = useState([]);
-    const [tree, setTree] = useState([]);
+    const [rootItems, setRootItems] = useState([]);
+    const [folderContents, setFolderContents] = useState({}); // {folderId: {folders: [], projects: []}}
     const [selectedProject, setSelectedProject] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    const loadData = useCallback(async () => {
+    const loadRootItems = useCallback(async () => {
         setLoading(true);
         try {
-            const [foldersData, projectsData] = await Promise.all([
+            const [allFolders, allProjects] = await Promise.all([
                 folderApi.getAll(),
                 projectApi.getAll(),
             ]);
 
-            console.log('Loaded folders:', foldersData);
-            console.log('Loaded projects:', projectsData);
+            console.log('Loaded all folders:', allFolders);
+            console.log('Loaded all projects:', allProjects);
 
-            setFolders(foldersData);
-            setProjects(projectsData);
+            const rootFolders = allFolders.filter(f => !f.parentId || f.parentId === null);
+            const rootProjects = allProjects.filter(p => !p.parentId || p.parentId === null);
 
-            const allItems = [
-                ...foldersData.map(f => ({ ...f, type: f.type || 'FOLDER' })),
-                ...projectsData.map(p => ({ ...p, type: p.type || 'PROJECT' })),
-            ];
+            console.log('Root folders:', rootFolders);
+            console.log('Root projects:', rootProjects);
 
-            console.log('All items for tree:', allItems);
+            setFolders(allFolders);
+            setProjects(allProjects);
 
-            const treeData = buildTree(allItems);
-            console.log('Built tree:', treeData);
+            const items = [
+                ...rootFolders.map(f => ({ ...f, type: f.type || 'FOLDER' })),
+                ...rootProjects.map(p => ({ ...p, type: p.type || 'PROJECT' })),
+            ].sort((a, b) => {
+                if (a.type === 'FOLDER' && b.type !== 'FOLDER') return -1;
+                if (a.type !== 'FOLDER' && b.type === 'FOLDER') return 1;
+                return a.name.localeCompare(b.name);
+            });
 
-            setTree(treeData);
+            console.log('Root items:', items);
+            setRootItems(items);
         } catch (error) {
             message.error('Ошибка загрузки данных: ' + error.message);
             console.error('Load data error:', error);
@@ -54,62 +60,120 @@ export const ProjectProvider = ({ children }) => {
         }
     }, []);
 
+    const loadFolderContent = useCallback(async (folderId) => {
+        if (folderContents[folderId]) {
+            return folderContents[folderId];
+        }
+
+        try {
+            const folderData = await folderApi.getById(folderId);
+            console.log('Loaded folder content:', folderData);
+
+            const content = {
+                folders: (folderData.children || []).filter(c => c.type === 'FOLDER'),
+                projects: (folderData.children || []).filter(c => c.type === 'PROJECT'),
+            };
+
+            setFolderContents(prev => ({
+                ...prev,
+                [folderId]: content,
+            }));
+
+            return content;
+        } catch (error) {
+            message.error('Ошибка загрузки папки: ' + error.message);
+            console.error('Load folder error:', error);
+            return { folders: [], projects: [] };
+        }
+    }, [folderContents]);
+
     const createFolder = useCallback(async (folderData) => {
         try {
             const newFolder = await folderApi.create(folderData);
-            await loadData();
+            await loadRootItems();
+
+            if (folderData.parentId) {
+                setFolderContents(prev => {
+                    const updated = { ...prev };
+                    delete updated[folderData.parentId];
+                    return updated;
+                });
+            }
+
             message.success('Папка создана');
             return newFolder;
         } catch (error) {
             message.error('Ошибка создания папки: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const updateFolder = useCallback(async (id, folderData) => {
         try {
             await folderApi.patch(id, folderData);
-            await loadData();
+            await loadRootItems();
+
+            setFolderContents({});
+
             message.success('Папка обновлена');
         } catch (error) {
             message.error('Ошибка обновления папки: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const deleteFolder = useCallback(async (id) => {
         try {
             await folderApi.delete(id);
-            await loadData();
+            await loadRootItems();
+
+            setFolderContents(prev => {
+                const updated = { ...prev };
+                delete updated[id];
+                return updated;
+            });
+
             message.success('Папка удалена');
         } catch (error) {
             message.error('Ошибка удаления папки: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const createProject = useCallback(async (projectData) => {
         try {
             const newProject = await projectApi.create(projectData);
-            await loadData();
+            await loadRootItems();
+
+            if (projectData.parentId) {
+                setFolderContents(prev => {
+                    const updated = { ...prev };
+                    delete updated[projectData.parentId];
+                    return updated;
+                });
+            }
+
             message.success('Проект создан');
             return newProject;
         } catch (error) {
             message.error('Ошибка создания проекта: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const updateProject = useCallback(async (id, projectData) => {
         try {
             await projectApi.patch(id, projectData);
-            await loadData();
+            await loadRootItems();
+
+            setFolderContents({});
+
             message.success('Проект обновлен');
         } catch (error) {
             message.error('Ошибка обновления проекта: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const deleteProject = useCallback(async (id) => {
         try {
@@ -117,13 +181,16 @@ export const ProjectProvider = ({ children }) => {
             if (selectedProject?.id === id) {
                 setSelectedProject(null);
             }
-            await loadData();
+            await loadRootItems();
+
+            setFolderContents({});
+
             message.success('Проект удален');
         } catch (error) {
             message.error('Ошибка удаления проекта: ' + error.message);
             throw error;
         }
-    }, [loadData, selectedProject]);
+    }, [loadRootItems, selectedProject]);
 
     const moveItem = useCallback(async (itemId, itemType, newParentId) => {
         try {
@@ -132,13 +199,16 @@ export const ProjectProvider = ({ children }) => {
             } else {
                 await projectApi.move(itemId, newParentId);
             }
-            await loadData();
+            await loadRootItems();
+
+            setFolderContents({});
+
             message.success('Элемент перемещен');
         } catch (error) {
             message.error('Ошибка перемещения: ' + error.message);
             throw error;
         }
-    }, [loadData]);
+    }, [loadRootItems]);
 
     const openProject = useCallback(async (projectId) => {
         try {
@@ -152,16 +222,18 @@ export const ProjectProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        loadRootItems();
+    }, [loadRootItems]);
 
     const value = {
         folders,
         projects,
-        tree,
+        rootItems,
+        folderContents,
         selectedProject,
         loading,
-        loadData,
+        loadRootItems,
+        loadFolderContent,
         createFolder,
         updateFolder,
         deleteFolder,

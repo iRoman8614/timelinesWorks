@@ -1,0 +1,34 @@
+.config-block {
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.config-block-navigation {
+    background: #fafafa;
+    padding: 16px 24px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: center;
+}
+
+.config-block-navigation .ant-btn:disabled {
+    cursor: not-allowed;
+}
+
+.config-block-content {
+    background: #fff;
+    border-radius: 8px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.config-block-content > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}

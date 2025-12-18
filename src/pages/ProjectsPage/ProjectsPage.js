@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
-import { Button, Input, Modal, Form, Empty, Spin } from 'antd';
-import { PlusOutlined, FolderAddOutlined, FileAddOutlined } from '@ant-design/icons';
-import { useProjects } from '../hooks/useProjectContext';
-import TreeNode from '../components/TreeNode';
-import { isDescendant } from '../utils/treeUtils';
+import { Button, Modal, Form, Empty, Spin, Input } from 'antd';
+import { FolderAddOutlined, FileAddOutlined } from '@ant-design/icons';
+import { useProjects } from '../../hooks/useProjectContext';
+import TreeNode from '../../components/TreeNode/TreeNode';
 import './ProjectsPage.css';
 
 const ProjectsPage = () => {
     const {
-        tree,
+        rootItems,
+        folderContents,
         loading,
+        loadFolderContent,
         createFolder,
         createProject,
         updateFolder,
@@ -21,11 +22,10 @@ const ProjectsPage = () => {
         openProject,
     } = useProjects();
 
-    // Логирование для отладки
     useEffect(() => {
-        console.log('ProjectsPage - tree updated:', tree);
-        console.log('ProjectsPage - tree length:', tree.length);
-    }, [tree]);
+        console.log('ProjectsPage - rootItems updated:', rootItems);
+        console.log('ProjectsPage - rootItems length:', rootItems.length);
+    }, [rootItems]);
 
     const [expanded, setExpanded] = useState({});
     const [selectedId, setSelectedId] = useState(null);
@@ -35,7 +35,6 @@ const ProjectsPage = () => {
     const [createParentId, setCreateParentId] = useState(null);
     const [form] = Form.useForm();
 
-    // Раскрытие/скрытие папки
     const handleExpand = (id) => {
         setExpanded((prev) => ({
             ...prev,
@@ -43,7 +42,10 @@ const ProjectsPage = () => {
         }));
     };
 
-    // Выбор элемента
+    const handleLoadFolder = async (folderId) => {
+        await loadFolderContent(folderId);
+    };
+
     const handleSelect = (node) => {
         setSelectedId(node.id);
         if (node.type === 'PROJECT') {
@@ -51,7 +53,6 @@ const ProjectsPage = () => {
         }
     };
 
-    // Открытие модального окна создания
     const handleCreate = (type, parentId = null) => {
         setCreateType(type);
         setCreateParentId(parentId);
@@ -59,7 +60,6 @@ const ProjectsPage = () => {
         form.resetFields();
     };
 
-    // Создание элемента
     const handleCreateSubmit = async () => {
         try {
             const values = await form.validateFields();
@@ -82,20 +82,23 @@ const ProjectsPage = () => {
         }
     };
 
-    // Переименование
-    const handleRename = async (id, type, newName) => {
+    const handleRename = async (id, type, newName, newDescription) => {
         try {
+            const updateData = {
+                name: newName,
+                description: newDescription || '',
+            };
+
             if (type === 'FOLDER') {
-                await updateFolder(id, { name: newName });
+                await updateFolder(id, updateData);
             } else {
-                await updateProject(id, { name: newName });
+                await updateProject(id, updateData);
             }
         } catch (error) {
             console.error('Rename error:', error);
         }
     };
 
-    // Удаление
     const handleDelete = async (id, type) => {
         try {
             if (type === 'FOLDER') {
@@ -108,7 +111,6 @@ const ProjectsPage = () => {
         }
     };
 
-    // Drag & Drop
     const handleDragStart = (event) => {
         setActiveId(event.active.id);
     };
@@ -122,28 +124,10 @@ const ProjectsPage = () => {
         const draggedItem = active.data.current.node;
         const targetItem = over.data.current?.node;
 
-        // Нельзя перемещать в самого себя или в свои потомки
         if (draggedItem.type === 'FOLDER' && targetItem) {
-            // Проверяем всё дерево, чтобы найти элементы
-            const allItems = [...tree];
-            const flattenTree = (nodes) => {
-                let result = [];
-                nodes.forEach(node => {
-                    result.push(node);
-                    if (node.children) {
-                        result = result.concat(flattenTree(node.children));
-                    }
-                });
-                return result;
-            };
-            const flatTree = flattenTree(allItems);
-
-            if (isDescendant(flatTree, draggedItem.id, targetItem.id)) {
-                return;
-            }
+            // TODO: добавить проверку на потомков
         }
 
-        // Перемещаем элемент
         const newParentId = targetItem?.type === 'FOLDER' ? targetItem.id : targetItem?.parentId || null;
 
         if (draggedItem.parentId !== newParentId) {
@@ -191,13 +175,13 @@ const ProjectsPage = () => {
                 </div>
 
                 <div className="projects-tree">
-                    {tree.length === 0 ? (
+                    {rootItems.length === 0 ? (
                         <Empty
                             description="Нет проектов"
                             image={Empty.PRESENTED_IMAGE_SIMPLE}
                         />
                     ) : (
-                        tree.map((node) => (
+                        rootItems.map((node) => (
                             <TreeNode
                                 key={node.id}
                                 node={node}
@@ -210,6 +194,9 @@ const ProjectsPage = () => {
                                 onCreateProject={handleCreate}
                                 onRename={handleRename}
                                 onDelete={handleDelete}
+                                onLoadFolder={handleLoadFolder}
+                                folderContent={node.type === 'FOLDER' ? folderContents[node.id] : null}
+                                folderContents={folderContents}
                             />
                         ))
                     )}

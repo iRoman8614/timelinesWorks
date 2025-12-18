@@ -1,0 +1,96 @@
+.configurator-step {
+    padding: 24px;
+    background: #fff;
+    border-radius: 8px;
+    height: calc(100vh - 280px);
+    display: flex;
+    flex-direction: column;
+}
+
+.configurator-step .ant-row {
+    flex: 1;
+    overflow: scroll;
+}
+
+.configurator-step .ant-col {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.component-type-form,
+.component-type-table {
+    background: #fafafa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    overflow: scroll;
+}
+
+.component-type-form h3,
+.component-type-table h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    flex-shrink: 0;
+}
+
+.component-type-form .ant-form {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.component-type-table .ant-table-wrapper {
+    flex: 1;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column;
+}
+
+.component-type-table .ant-table {
+    flex: 1;
+}
+
+.component-type-table .ant-spin-nested-loading {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.component-type-table .ant-spin-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.component-type-table .ant-table-container {
+    flex: 1;
+    overflow: auto;
+}
+
+@media (max-width: 992px) {
+    .configurator-step {
+        height: auto;
+    }
+
+    .configurator-step .ant-row {
+        flex-direction: column;
+    }
+
+    .configurator-step .ant-col-lg-8 {
+        margin-bottom: 24px;
+        height: auto;
+    }
+
+    .component-type-form,
+    .component-type-table {
+        height: auto;
+        min-height: 400px;
+    }
+}

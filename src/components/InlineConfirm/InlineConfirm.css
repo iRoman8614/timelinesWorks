@@ -1,0 +1,29 @@
+.inline-confirm-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.inline-confirm-yes {
+    padding: 0 6px;
+    height: 28px;
+}
+
+.inline-confirm-yes:hover {
+    background: #f6ffed;
+    border-color: #52c41a;
+}
+
+.inline-confirm-yes.ant-btn-dangerous:hover {
+    background: #fff2f0;
+    border-color: #ff4d4f;
+}
+
+.inline-confirm-no {
+    padding: 0 6px;
+    height: 28px;
+}
+
+.inline-confirm-no:hover {
+    background: #e6e6e6;
+}

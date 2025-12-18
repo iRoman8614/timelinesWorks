@@ -1,0 +1,40 @@
+.project-editor {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #fafafa;
+}
+
+.project-editor-loading {
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.project-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    background: #ffffff;
+    border-bottom: 1px solid #e8e8e8;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.project-editor-header h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #262626;
+}
+
+.project-editor-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+.project-editor-content p {
+    margin: 8px 0;
+}
