@@ -30,13 +30,16 @@ const ProjectsPage = () => {
         return (
             <div
                 ref={setNodeRef}
-                className={`root-drop-zone ${isOver ? 'root-drop-zone-over' : ''} ${isActive ? 'root-drop-zone-active' : ''}`}
+                className={`root-drop-zone-item ${isOver ? 'root-drop-zone-item-over' : ''}`}
+                style={{
+                    opacity: isActive ? (isOver ? 1 : 0.6) : 0,
+                    pointerEvents: isActive ? 'auto' : 'none',
+                    transition: 'opacity 0.3s ease'
+                }}
             >
-                {isActive && (
-                    <div className="root-drop-zone-content">
-                        Извлечь проект из папок
-                    </div>
-                )}
+                <div className="root-drop-zone-item-content">
+                    📁 Переместить в корень
+                </div>
             </div>
         );
     };
@@ -235,9 +238,9 @@ const ProjectsPage = () => {
                     </div>
                 </div>
 
-                <RootDropZone isActive={activeId !== null} />
-
                 <div className="projects-tree">
+                    <RootDropZone isActive={activeId !== null} />
+
                     {rootItems.length === 0 ? (
                         <Empty
                             description="Нет проектов"

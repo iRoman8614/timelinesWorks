@@ -4,6 +4,7 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import ConfiguratorStep1 from './configurator/ConfiguratorStep1';
 import ConfiguratorStep2 from './configurator/ConfiguratorStep2';
 import ConfiguratorStep3 from './configurator/ConfiguratorStep3';
+import ConfiguratorStep4 from './configurator/ConfiguratorStep4';
 import './ConfigBlock.css';
 
 const ConfigBlock = ({ initialStructure, onSave }) => {
@@ -283,6 +284,144 @@ const ConfigBlock = ({ initialStructure, onSave }) => {
         }));
     }, [updateStructure]);
 
+    const handleAddNode = useCallback((node) => {
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: [...prev.nodes, node]
+        }));
+    }, [updateStructure]);
+
+    const handleUpdateNode = useCallback((id, updates) => {
+        const updateInTree = (nodes) => {
+            return nodes.map(node => {
+                if (node.id === id) {
+                    return { ...node, ...updates };
+                }
+                if (node.children) {
+                    return { ...node, children: updateInTree(node.children) };
+                }
+                return node;
+            });
+        };
+
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: updateInTree(prev.nodes)
+        }));
+    }, [updateStructure]);
+
+    const handleDeleteNode = useCallback((id) => {
+        const removeFromTree = (nodes) => {
+            return nodes.filter(node => node.id !== id).map(node => {
+                if (node.children) {
+                    return { ...node, children: removeFromTree(node.children) };
+                }
+                return node;
+            });
+        };
+
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: removeFromTree(prev.nodes)
+        }));
+    }, [updateStructure]);
+
+    const handleAddAssembly = useCallback((assembly) => {
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: [...prev.nodes, assembly]
+        }));
+    }, [updateStructure]);
+
+    const handleUpdateAssembly = useCallback((id, updates) => {
+        const updateInTree = (nodes) => {
+            return nodes.map(node => {
+                if (node.id === id) {
+                    return { ...node, ...updates };
+                }
+                if (node.children) {
+                    return { ...node, children: updateInTree(node.children) };
+                }
+                return node;
+            });
+        };
+
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: updateInTree(prev.nodes)
+        }));
+    }, [updateStructure]);
+
+    const handleDeleteAssembly = useCallback((id) => {
+        const removeFromTree = (nodes) => {
+            return nodes.filter(node => node.id !== id).map(node => {
+                if (node.children) {
+                    return { ...node, children: removeFromTree(node.children) };
+                }
+                return node;
+            });
+        };
+
+        return updateStructure(prev => ({
+            ...prev,
+            nodes: removeFromTree(prev.nodes)
+        }));
+    }, [updateStructure]);
+
+    const handleMoveNodeItem = useCallback((itemId, newParentId) => {
+        let movedItem = null;
+
+        const removeItem = (nodes) => {
+            const result = [];
+            for (const node of nodes) {
+                if (node.id === itemId) {
+                    const { parentId: oldParentId, ...rest } = node;
+                    movedItem = newParentId === null
+                        ? { ...rest, parentId: null }
+                        : { ...rest, parentId: newParentId };
+                } else {
+                    const newNode = { ...node };
+                    if (node.children) {
+                        newNode.children = removeItem(node.children);
+                    }
+                    result.push(newNode);
+                }
+            }
+            return result;
+        };
+
+        const insertItem = (nodes) => {
+            if (newParentId === null) {
+                return nodes;
+            }
+
+            return nodes.map(node => {
+                if (node.id === newParentId && node.type === 'NODE') {
+                    return {
+                        ...node,
+                        children: [...(node.children || []), movedItem]
+                    };
+                }
+                if (node.children) {
+                    return { ...node, children: insertItem(node.children) };
+                }
+                return node;
+            });
+        };
+
+        return updateStructure(prev => {
+            let newNodes = removeItem(prev.nodes);
+
+            if (newParentId === null && movedItem) {
+                newNodes = [...newNodes, movedItem];
+            } else if (movedItem) {
+                newNodes = insertItem(newNodes);
+            }
+
+            return { ...prev, nodes: newNodes };
+        });
+    }, [updateStructure]);
+
     const canGoToStep = (step) => {
         if (step === 0) return true;
         if (step === 1) return structure?.componentTypes?.length > 0;
@@ -385,9 +524,17 @@ const ConfigBlock = ({ initialStructure, onSave }) => {
                 )}
 
                 {currentStep === 3 && (
-                    <div style={{ padding: 24, textAlign: 'center', color: '#8c8c8c' }}>
-                        <h3>Шаг 4: Структура узлов</h3>
-                    </div>
+                    <ConfiguratorStep4
+                        nodes={structure.nodes}
+                        assemblyTypes={structure.assemblyTypes}
+                        onAddNode={handleAddNode}
+                        onUpdateNode={handleUpdateNode}
+                        onDeleteNode={handleDeleteNode}
+                        onAddAssembly={handleAddAssembly}
+                        onUpdateAssembly={handleUpdateAssembly}
+                        onDeleteAssembly={handleDeleteAssembly}
+                        onMoveItem={handleMoveNodeItem}
+                    />
                 )}
             </div>
         </div>

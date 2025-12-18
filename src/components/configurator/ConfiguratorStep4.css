@@ -1,0 +1,78 @@
+.node-form,
+.assembly-form,
+.node-structure-tree {
+    background: #fafafa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+    overflow: scroll;
+}
+
+.node-form h3,
+.assembly-form h3,
+.node-structure-tree h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    flex-shrink: 0;
+}
+
+.node-structure-tree .ant-table-wrapper {
+    flex: 1;
+    overflow: scroll;
+    display: flex;
+    flex-direction: column;
+}
+
+.node-structure-tree .ant-table {
+    flex: 1;
+}
+
+/* Выравнивание первой колонки с handle */
+.node-structure-tree .ant-table-tbody > tr > td:first-child {
+    display: table-cell;
+    vertical-align: middle;
+}
+
+/* Root Drop Zone для узлов - строка таблицы */
+.node-root-drop-zone-row {
+    transition: opacity 0.3s ease, background 0.2s ease;
+}
+
+.node-root-drop-zone-row td {
+    padding: 12px 16px !important;
+    background: #f0f5ff;
+    border: 2px dashed #597ef7;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.node-root-drop-zone-row-over td {
+    background: #d6e4ff;
+    border-color: #2f54eb;
+    border-style: solid;
+}
+
+.node-root-drop-zone-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #2f54eb;
+    font-size: 14px;
+    font-weight: 500;
+    justify-content: center;
+}
+
+.drag-overlay-node {
+    padding: 8px 16px;
+    background: #597ef7;
+    color: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 14px;
+}

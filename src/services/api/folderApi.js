@@ -83,9 +83,20 @@ const folderApi = {
      * @returns {Promise<Object>}
      */
     move: async (id, parentId) => {
-        const response = await axiosInstance.patch(`/api/folders/${id}`, {
-            parentId,
-        });
+        const folder = await axiosInstance.get(`/api/folders/${id}`);
+
+        const payload = {
+            id: folder.data.id,
+            name: folder.data.name,
+            description: folder.data.description || '',
+            type: 'FOLDER'
+        };
+
+        if (parentId !== null) {
+            payload.parentId = parentId;
+        }
+
+        const response = await axiosInstance.put(`/api/folders/${id}`, payload);
         return response.data;
     },
 };

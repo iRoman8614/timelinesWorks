@@ -85,9 +85,24 @@ const projectApi = {
      * @returns {Promise<Object>}
      */
     move: async (id, parentId) => {
-        const response = await axiosInstance.patch(`/api/projects/${id}`, {
-            parentId,
-        });
+        const project = await axiosInstance.get(`/api/projects/${id}`);
+
+        const payload = {
+            id: project.data.id,
+            name: project.data.name,
+            description: project.data.description || '',
+            type: 'PROJECT'
+        };
+
+        if (project.data.structure) {
+            payload.structure = project.data.structure;
+        }
+
+        if (parentId !== null) {
+            payload.parentId = parentId;
+        }
+
+        const response = await axiosInstance.put(`/api/projects/${id}`, payload);
         return response.data;
     },
 
