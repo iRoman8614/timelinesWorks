@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DndContext, DragOverlay, closestCenter } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, useDroppable } from '@dnd-kit/core';
 import { Button, Modal, Form, Empty, Spin, Input } from 'antd';
 import { FolderAddOutlined, FileAddOutlined } from '@ant-design/icons';
 import { useProjects } from '../../hooks/useProjectContext';
@@ -21,6 +21,25 @@ const ProjectsPage = () => {
         moveItem,
         openProject,
     } = useProjects();
+
+    const RootDropZone = ({ isActive }) => {
+        const { setNodeRef, isOver } = useDroppable({
+            id: 'root-drop-zone',
+        });
+
+        return (
+            <div
+                ref={setNodeRef}
+                className={`root-drop-zone ${isOver ? 'root-drop-zone-over' : ''} ${isActive ? 'root-drop-zone-active' : ''}`}
+            >
+                {isActive && (
+                    <div className="root-drop-zone-content">
+                        Извлечь проект из папок
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     useEffect(() => {
         console.log('ProjectsPage - rootItems updated:', rootItems);
@@ -124,11 +143,53 @@ const ProjectsPage = () => {
         const draggedItem = active.data.current.node;
         const targetItem = over.data.current?.node;
 
-        if (draggedItem.type === 'FOLDER' && targetItem) {
-            // TODO: добавить проверку на потомков
+        let newParentId;
+
+        if (over.id === 'root-drop-zone') {
+            newParentId = null;
+        } else if (targetItem?.type === 'FOLDER') {
+            newParentId = targetItem.id;
+        } else if (targetItem?.parentId !== undefined) {
+            newParentId = targetItem.parentId;
+        } else {
+            return;
         }
 
-        const newParentId = targetItem?.type === 'FOLDER' ? targetItem.id : targetItem?.parentId || null;
+        if (draggedItem.id === newParentId) {
+            console.log('Нельзя переместить папку саму в себя');
+            return;
+        }
+
+        if (draggedItem.type === 'FOLDER' && newParentId) {
+            const isDescendant = (folderId, targetId) => {
+                const queue = [folderId];
+                const visited = new Set();
+
+                while (queue.length > 0) {
+                    const currentId = queue.shift();
+
+                    if (visited.has(currentId)) continue;
+                    visited.add(currentId);
+
+                    if (currentId === targetId) return true;
+
+                    const content = folderContents[currentId];
+                    if (content) {
+                        content.forEach(item => {
+                            if (item.type === 'FOLDER') {
+                                queue.push(item.id);
+                            }
+                        });
+                    }
+                }
+                return false;
+            };
+
+            if (isDescendant(draggedItem.id, newParentId)) {
+                console.log('Нельзя переместить папку в своих потомков');
+                return;
+            }
+        }
 
         if (draggedItem.parentId !== newParentId) {
             moveItem(draggedItem.id, draggedItem.type, newParentId);
@@ -173,6 +234,8 @@ const ProjectsPage = () => {
                         </Button>
                     </div>
                 </div>
+
+                <RootDropZone isActive={activeId !== null} />
 
                 <div className="projects-tree">
                     {rootItems.length === 0 ? (
