@@ -98,6 +98,10 @@ const projectApi = {
             payload.structure = project.data.structure;
         }
 
+        if (project.data.historyUpdatedAt) {
+            payload.historyUpdatedAt = project.data.historyUpdatedAt;
+        }
+
         if (parentId !== null) {
             payload.parentId = parentId;
         }

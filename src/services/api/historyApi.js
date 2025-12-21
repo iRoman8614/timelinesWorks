@@ -18,7 +18,7 @@ const historyApi = {
                 baseDate,
                 calculateOperatingHours
             },
-            responseType: 'blob', // Важно для скачивания файлов
+            responseType: 'blob',
         });
         return response.data;
     },
@@ -66,7 +66,7 @@ const historyApi = {
      * @param {string} [filename] - Имя файла (по умолчанию: template_YYYY-MM-DD.xlsx)
      * @returns {Promise<void>}
      */
-    downloadTemplateFile: async (projectId, baseDate, calculateOperatingHours = false, filename = null) => {
+    downloadTemplateFile: async (projectId, baseDate, calculateOperatingHours = true, filename = null) => {
         const blob = await historyApi.downloadTemplate(projectId, baseDate, calculateOperatingHours);
         const defaultFilename = `template_${baseDate}.xlsx`;
         historyApi.downloadFile(blob, filename || defaultFilename);

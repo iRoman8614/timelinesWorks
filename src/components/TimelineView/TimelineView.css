@@ -32,13 +32,25 @@
     color: #262626;
 }
 
-.timeline-container {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
+.timeline-top-scrollbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 16px;
+    margin-bottom: 4px;
 }
 
-/* Кастомный трек с отступами */
+.timeline-top-scrollbar-inner {
+    height: 1px;
+}
+
+.timeline-container {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    height: 65vh;
+    max-height: 65vh;
+}
+
 .custom-track {
     display: flex;
     align-items: center;
@@ -91,7 +103,6 @@
     text-overflow: ellipsis;
 }
 
-/* Переопределение стилей react-timelines */
 .react-timelines {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
 }
@@ -129,6 +140,26 @@
     background: #fafafa !important;
     border-right: 1px solid #f0f0f0 !important;
     min-width: 250px !important;
+    max-width: 250px !important;
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 10 !important;
+}
+
+.react-timelines .rt-track__header {
+    padding-left: 8px !important;
+}
+
+.react-timelines .rt-track .rt-track .rt-track__header {
+    padding-left: 24px !important;
+}
+
+.react-timelines .rt-track .rt-track .rt-track .rt-track__header {
+    padding-left: 48px !important;
+}
+
+.react-timelines .rt-track .rt-track .rt-track .rt-track .rt-track__header {
+    padding-left: 72px !important;
 }
 
 .react-timelines .rt-timeline__sidebar-title {
@@ -136,27 +167,29 @@
     font-size: 14px !important;
 }
 
-.react-timelines .rt-timeline__marker--now {
-    background: #ff4d4f !important;
-    width: 2px !important;
+.react-timelines .rt-marker--now {
+    z-index: 100 !important;
 }
 
-.react-timelines .rt-timeline__marker--now::before {
-    content: 'Today';
-    position: absolute;
-    top: -24px;
-    left: -20px;
-    background: #ff4d4f;
-    color: #fff;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(255, 77, 79, 0.3);
+.react-timelines .rt-marker--pointer {
+    z-index: 99 !important;
 }
 
-/* Scrollbar styling */
+.react-timelines .rt-element__tooltip {
+    font-size: 12px !important;
+    background: rgba(60, 60, 60, 0.95) !important;
+    color: #fff !important;
+    padding: 8px 12px !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    white-space: pre-line !important;
+}
+
+.react-timelines .rt-element:hover {
+    z-index: 999999 !important;
+    position: relative !important;
+}
+
 .timeline-container ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -173,4 +206,12 @@
 
 .timeline-container ::-webkit-scrollbar-thumb:hover {
     background: #8c8c8c;
+}
+
+.timeline-container.hide-days-text .rt-timebar__row:last-child .rt-timebar__cell {
+    font-size: 0 !important;
+}
+
+.timeline-container.hide-days-text .rt-timebar__row:last-child .rt-timebar__label {
+    font-size: 0 !important;
 }

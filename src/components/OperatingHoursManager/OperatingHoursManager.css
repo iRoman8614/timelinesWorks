@@ -10,7 +10,8 @@
     border-bottom: 1px solid #f0f0f0;
 }
 
-.plan-panel .ant-collapse-content-box {
+.plan-panel .ant-collapse-content-box,
+.operating-panel .ant-collapse-content-box {
     padding: 0;
 }
 

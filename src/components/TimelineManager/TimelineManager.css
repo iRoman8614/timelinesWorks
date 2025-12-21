@@ -1,0 +1,29 @@
+.timeline-manager {
+    margin-bottom: 16px;
+}
+
+.timeline-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+}
+
+.timeline-manager-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+}
+
+.timeline-manager-empty {
+    padding: 40px;
+    text-align: center;
+    color: #8c8c8c;
+    background: #fafafa;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+}

@@ -11,6 +11,7 @@ const ProjectsPage = () => {
         rootItems,
         folderContents,
         loading,
+        loadRootItems,
         loadFolderContent,
         createFolder,
         createProject,
@@ -21,6 +22,10 @@ const ProjectsPage = () => {
         moveItem,
         openProject,
     } = useProjects();
+
+    useEffect(() => {
+        loadRootItems();
+    }, []);
 
     const RootDropZone = ({ isActive }) => {
         const { setNodeRef, isOver } = useDroppable({
@@ -44,10 +49,6 @@ const ProjectsPage = () => {
         );
     };
 
-    useEffect(() => {
-        console.log('ProjectsPage - rootItems updated:', rootItems);
-        console.log('ProjectsPage - rootItems length:', rootItems.length);
-    }, [rootItems]);
 
     const [expanded, setExpanded] = useState({});
     const [selectedId, setSelectedId] = useState(null);
@@ -189,7 +190,6 @@ const ProjectsPage = () => {
             };
 
             if (isDescendant(draggedItem.id, newParentId)) {
-                console.log('Нельзя переместить папку в своих потомков');
                 return;
             }
         }

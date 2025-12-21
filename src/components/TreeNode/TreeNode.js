@@ -10,9 +10,10 @@ import {
     DeleteOutlined,
     PlusOutlined,
     FileAddOutlined,
-    HolderOutlined
+    HolderOutlined,
+    CheckOutlined,
+    CloseOutlined
 } from '@ant-design/icons';
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { Input, Button, Tooltip } from 'antd';
 import InlineConfirm from '../InlineConfirm/InlineConfirm';
 import './TreeNode.css';
@@ -168,125 +169,125 @@ const TreeNode = ({
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
             >
-                    {!editMode && (
-                        <span
-                            ref={setDragRef}
-                            className="tree-node-drag-handle"
-                            {...attributes}
-                            {...listeners}
-                            onClick={(e) => e.stopPropagation()}
-                        >
+                {!editMode && (
+                    <span
+                        ref={setDragRef}
+                        className="tree-node-drag-handle"
+                        {...attributes}
+                        {...listeners}
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <HolderOutlined />
                     </span>
-                    )}
+                )}
 
-                    <div className="tree-node-content">
-                        {isFolder && !editMode && (
-                            <span className="tree-node-expand" onClick={handleToggle}>
+                <div className="tree-node-content">
+                    {isFolder && !editMode && (
+                        <span className="tree-node-expand" onClick={handleToggle}>
                             <span className={`expand-icon ${isExpanded ? 'expanded' : ''}`}>▸</span>
                         </span>
-                        )}
-                        {(!isFolder || editMode) && <span className="tree-node-expand"></span>}
+                    )}
+                    {(!isFolder || editMode) && <span className="tree-node-expand"></span>}
 
-                        <span className="tree-node-icon">{renderIcon()}</span>
+                    <span className="tree-node-icon">{renderIcon()}</span>
 
-                        {editMode ? (
-                            <div className="tree-node-edit-form" onClick={(e) => e.stopPropagation()}>
-                                <Input
-                                    size="small"
-                                    placeholder="Название"
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    onPressEnter={handleSaveEdit}
-                                    autoFocus
-                                    className="tree-node-input-name"
-                                />
-                                <Input
-                                    size="small"
-                                    placeholder="Описание (опционально)"
-                                    value={editDescription}
-                                    onChange={(e) => setEditDescription(e.target.value)}
-                                    onPressEnter={handleSaveEdit}
-                                    className="tree-node-input-desc"
-                                />
-                                <div className="tree-node-edit-buttons">
-                                    <Tooltip title="Сохранить">
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<CheckOutlined />}
-                                            onClick={handleSaveEdit}
-                                            className="tree-node-edit-save"
-                                        />
-                                    </Tooltip>
-                                    <Tooltip title="Отменить">
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<CloseOutlined />}
-                                            onClick={handleCancelEdit}
-                                            className="tree-node-edit-cancel"
-                                        />
-                                    </Tooltip>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="tree-node-info">
-                                <span className="tree-node-label">{node.name}</span>
-                                {node.description && (
-                                    <span className="tree-node-description">{node.description}</span>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    {!editMode && (
-                        <div className={`tree-node-actions ${hovered ? 'visible' : ''}`}>
-                            {isFolder && (
-                                <>
-                                    <Tooltip title="Создать папку">
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<PlusOutlined />}
-                                            onClick={handleCreateFolder}
-                                        />
-                                    </Tooltip>
-                                    <Tooltip title="Создать проект">
-                                        <Button
-                                            type="text"
-                                            size="small"
-                                            icon={<FileAddOutlined />}
-                                            onClick={handleCreateProject}
-                                        />
-                                    </Tooltip>
-                                </>
-                            )}
-                            <Tooltip title="Переименовать">
-                                <Button
-                                    type="text"
-                                    size="small"
-                                    icon={<EditOutlined />}
-                                    onClick={handleStartEdit}
-                                />
-                            </Tooltip>
-
-                            <InlineConfirm
-                                onConfirm={handleConfirmDelete}
-                                confirmText="Подтвердить удаление"
-                                cancelText="Отменить"
-                                danger
-                            >
-                                <Tooltip title="Удалить">
+                    {editMode ? (
+                        <div className="tree-node-edit-form" onClick={(e) => e.stopPropagation()}>
+                            <Input
+                                size="small"
+                                placeholder="Название"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                onPressEnter={handleSaveEdit}
+                                autoFocus
+                                className="tree-node-input-name"
+                            />
+                            <Input
+                                size="small"
+                                placeholder="Описание (опционально)"
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                onPressEnter={handleSaveEdit}
+                                className="tree-node-input-desc"
+                            />
+                            <div className="tree-node-edit-buttons">
+                                <Tooltip title="Сохранить">
                                     <Button
                                         type="text"
                                         size="small"
-                                        danger
-                                        icon={<DeleteOutlined />}
+                                        icon={<CheckOutlined />}
+                                        onClick={handleSaveEdit}
+                                        className="tree-node-edit-save"
                                     />
                                 </Tooltip>
-                            </InlineConfirm>
+                                <Tooltip title="Отменить">
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<CloseOutlined />}
+                                        onClick={handleCancelEdit}
+                                        className="tree-node-edit-cancel"
+                                    />
+                                </Tooltip>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="tree-node-info">
+                            <span className="tree-node-label">{node.name}</span>
+                            {node.description && (
+                                <span className="tree-node-description">{node.description}</span>
+                            )}
                         </div>
                     )}
+                </div>
+                {!editMode && (
+                    <div className={`tree-node-actions ${hovered ? 'visible' : ''}`}>
+                        {isFolder && (
+                            <>
+                                <Tooltip title="Создать папку">
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<PlusOutlined />}
+                                        onClick={handleCreateFolder}
+                                    />
+                                </Tooltip>
+                                <Tooltip title="Создать проект">
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<FileAddOutlined />}
+                                        onClick={handleCreateProject}
+                                    />
+                                </Tooltip>
+                            </>
+                        )}
+                        <Tooltip title="Переименовать">
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={handleStartEdit}
+                            />
+                        </Tooltip>
+
+                        <InlineConfirm
+                            onConfirm={handleConfirmDelete}
+                            confirmText="Подтвердить удаление"
+                            cancelText="Отменить"
+                            danger
+                        >
+                            <Tooltip title="Удалить">
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                />
+                            </Tooltip>
+                        </InlineConfirm>
+                    </div>
+                )}
             </div>
 
             {isFolder && isExpanded && children.length > 0 && (

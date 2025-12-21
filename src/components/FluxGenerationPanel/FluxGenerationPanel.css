@@ -1,0 +1,26 @@
+.flux-generation-panel {
+    margin-top: 16px;
+    border: 1px solid #1890ff;
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+}
+
+.flux-generation-panel .ant-card-head {
+    color: white;
+    font-weight: 600;
+}
+
+.flux-generation-panel .ant-card-head-title {
+    color: white;
+}
+
+.flux-generation-panel .ant-card-body {
+    padding: 16px;
+}
+
+.flux-generation-panel .ant-alert {
+    margin-bottom: 0;
+}
+
+.flux-generation-panel .ant-btn {
+    min-width: 180px;
+}

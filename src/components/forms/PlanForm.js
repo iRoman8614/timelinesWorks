@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Form, Input, DatePicker, Button, message } from 'antd';
 import { PlusOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,10 +7,33 @@ import dayjs from 'dayjs';
 const { TextArea } = Input;
 const { RangePicker } = DatePicker;
 
-const PlanForm = ({ projectId, onAdd, onUpdate, editingItem, onCancelEdit }) => {
+const PlanForm = ({ projectId, historyUpdatedAt, onAdd, onUpdate, editingItem, onCancelEdit }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const isEditing = !!editingItem;
+
+    const minDate = useMemo(() => {
+        if (historyUpdatedAt) {
+            return dayjs(historyUpdatedAt);
+        }
+        return null;
+    }, [historyUpdatedAt]);
+
+    const validateDateRange = (_, value) => {
+        if (!value || !value[0] || !value[1]) {
+            return Promise.resolve();
+        }
+
+        const [startDate] = value;
+
+        if (minDate && startDate.isBefore(minDate, 'day')) {
+            return Promise.reject(
+                new Error(`Начальная дата не может быть раньше ${minDate.format('DD.MM.YYYY')} (последнее обновление истории)`)
+            );
+        }
+
+        return Promise.resolve();
+    };
 
     useEffect(() => {
         if (editingItem) {
@@ -36,13 +59,12 @@ const PlanForm = ({ projectId, onAdd, onUpdate, editingItem, onCancelEdit }) => 
                 name: values.name,
                 description: values.description || '',
                 projectId: projectId,
-                startTime: startTime.toISOString(),
-                endTime: endTime.toISOString(),
-                timeline: '{}'  // Пустой JSON по умолчанию
+                startTime: startTime.format('YYYY-MM-DDTHH:mm:ss'),
+                endTime: endTime.format('YYYY-MM-DDTHH:mm:ss'),
+                timeline: '{}'
             };
 
             if (isEditing) {
-                // POST с тем же ID (перезапись)
                 const updatedPlan = {
                     id: editingItem.id,
                     ...data
@@ -106,12 +128,19 @@ const PlanForm = ({ projectId, onAdd, onUpdate, editingItem, onCancelEdit }) => 
                     label="Период"
                     name="dateRange"
                     rules={[
-                        { required: true, message: 'Выберите период' }
+                        { required: true, message: 'Выберите период' },
+                        { validator: validateDateRange }
                     ]}
                 >
                     <RangePicker
                         style={{ width: '100%' }}
                         format="DD.MM.YYYY"
+                        disabledDate={(current) => {
+                            if (minDate && current) {
+                                return current.isBefore(minDate, 'day');
+                            }
+                            return false;
+                        }}
                     />
                 </Form.Item>
 

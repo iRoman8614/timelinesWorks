@@ -2,6 +2,24 @@
     padding: 24px;
     height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.plan-editor-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+    flex-shrink: 0;
+}
+
+.plan-editor-actions .ant-btn {
+    flex: 1;
+    height: 40px;
 }
 
 .plan-form,
@@ -31,6 +49,14 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+.active-plan-row {
+    background-color: #e6f7ff !important;
+}
+
+.active-plan-row:hover {
+    background-color: #bae7ff !important;
 }
 
 .plan-table .ant-table {

@@ -20,7 +20,7 @@ const ProjectEditor = () => {
         if (projectId) {
             openProject(projectId);
         }
-    }, [projectId, openProject]);
+    }, [projectId]);
 
     useEffect(() => {
         if (selectedProject) {
@@ -112,7 +112,23 @@ const ProjectEditor = () => {
                         key="timeline"
                     >
                         <div className="timeline-tab">
-                            <TimelineBlock project={selectedProject} />
+                            <TimelineBlock
+                                project={selectedProject}
+                                onProjectUpdate={async (updatedProject) => {
+                                    if (updatedProject._refresh) {
+                                        openProject(selectedProject.id);
+                                        return;
+                                    }
+                                    if (updatedProject.timeline) {
+                                        await updateProject(selectedProject.id, {
+                                            timeline: typeof updatedProject.timeline === 'string'
+                                                ? updatedProject.timeline
+                                                : JSON.stringify(updatedProject.timeline)
+                                        });
+                                        openProject(selectedProject.id);
+                                    }
+                                }}
+                            />
                         </div>
                     </TabPane>
 

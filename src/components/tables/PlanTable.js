@@ -1,14 +1,31 @@
 import React from 'react';
 import { Table, Button, Space, message } from 'antd';
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import InlineConfirm from '../InlineConfirm/InlineConfirm';
 
-const PlanTable = ({ plans, onEdit, onDelete }) => {
+const PlanTable = ({ plans, onEdit, onDelete, onSelect }) => {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const activePlanId = searchParams.get('planId');
+
     const handleDelete = async (id) => {
         const success = await onDelete(id);
         if (success !== false) {
             message.success('План удалён');
+        }
+    };
+
+    const handleRowClick = (record, event) => {
+        const target = event.target;
+        const isActionButton = target.closest('.ant-btn') || target.closest('.ant-popover');
+
+        if (!isActionButton) {
+            navigate(`?planId=${record.id}`, { replace: true });
+            if (onSelect) {
+                onSelect(record);
+            }
         }
     };
 
@@ -17,13 +34,13 @@ const PlanTable = ({ plans, onEdit, onDelete }) => {
             title: 'Название',
             dataIndex: 'name',
             key: 'name',
-            width: '30%',
+            width: '25%',
         },
         {
             title: 'Описание',
             dataIndex: 'description',
             key: 'description',
-            width: '30%',
+            width: '20%',
             render: (text) => text || <span style={{ color: '#8c8c8c' }}>—</span>
         },
         {
@@ -39,7 +56,7 @@ const PlanTable = ({ plans, onEdit, onDelete }) => {
         {
             title: 'Действия',
             key: 'actions',
-            width: '15%',
+            width: '30%',
             render: (_, record) => (
                 <Space>
                     <Button
@@ -78,6 +95,13 @@ const PlanTable = ({ plans, onEdit, onDelete }) => {
                     emptyText: 'Нет планов. Создайте первый план.'
                 }}
                 scroll={{ y: 'calc(100vh - 500px)' }}
+                onRow={(record) => ({
+                    onClick: (event) => handleRowClick(record, event),
+                    style: { cursor: 'pointer' }
+                })}
+                rowClassName={(record) =>
+                    record.id === activePlanId ? 'active-plan-row' : ''
+                }
             />
         </div>
     );

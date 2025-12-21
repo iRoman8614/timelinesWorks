@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { message } from 'antd';
 import folderApi from '../services/api/folderApi';
 import projectApi from '../services/api/projectApi';
@@ -29,14 +29,8 @@ export const ProjectProvider = ({ children }) => {
                 projectApi.getAll(),
             ]);
 
-            console.log('Loaded all folders:', allFolders);
-            console.log('Loaded all projects:', allProjects);
-
             const rootFolders = allFolders.filter(f => !f.parentId || f.parentId === null);
             const rootProjects = allProjects.filter(p => !p.parentId || p.parentId === null);
-
-            console.log('Root folders:', rootFolders);
-            console.log('Root projects:', rootProjects);
 
             setFolders(allFolders);
             setProjects(allProjects);
@@ -50,11 +44,9 @@ export const ProjectProvider = ({ children }) => {
                 return a.name.localeCompare(b.name);
             });
 
-            console.log('Root items:', items);
             setRootItems(items);
         } catch (error) {
             message.error('Ошибка загрузки данных: ' + error.message);
-            console.error('Load data error:', error);
         } finally {
             setLoading(false);
         }
@@ -67,8 +59,6 @@ export const ProjectProvider = ({ children }) => {
 
         try {
             const folderData = await folderApi.getById(folderId);
-            console.log('Loaded folder content:', folderData);
-
             const content = {
                 folders: (folderData.children || []).filter(c => c.type === 'FOLDER'),
                 projects: (folderData.children || []).filter(c => c.type === 'PROJECT'),
@@ -82,7 +72,6 @@ export const ProjectProvider = ({ children }) => {
             return content;
         } catch (error) {
             message.error('Ошибка загрузки папки: ' + error.message);
-            console.error('Load folder error:', error);
             return { folders: [], projects: [] };
         }
     }, [folderContents]);
@@ -163,7 +152,21 @@ export const ProjectProvider = ({ children }) => {
 
     const updateProject = useCallback(async (id, projectData) => {
         try {
-            await projectApi.patch(id, projectData);
+            const currentProject = await projectApi.getById(id);
+            const mergedData = {
+                ...currentProject,
+                ...projectData
+            };
+
+            await projectApi.patch(id, mergedData);
+
+            if (selectedProject?.id === id) {
+                setSelectedProject(prev => ({
+                    ...prev,
+                    ...mergedData
+                }));
+            }
+
             await loadRootItems();
 
             setFolderContents({});
@@ -173,7 +176,7 @@ export const ProjectProvider = ({ children }) => {
             message.error('Ошибка обновления проекта: ' + error.message);
             throw error;
         }
-    }, [loadRootItems]);
+    }, [loadRootItems, selectedProject]);
 
     const deleteProject = useCallback(async (id) => {
         try {
@@ -220,10 +223,6 @@ export const ProjectProvider = ({ children }) => {
             throw error;
         }
     }, []);
-
-    useEffect(() => {
-        loadRootItems();
-    }, [loadRootItems]);
 
     const value = {
         folders,
