@@ -215,3 +215,9 @@
 .timeline-container.hide-days-text .rt-timebar__row:last-child .rt-timebar__label {
     font-size: 0 !important;
 }
+
+.rt-element[style*="z-index: 200"] {
+    overflow: visible !important;
+    text-overflow: unset !important;
+    white-space: nowrap !important;
+}

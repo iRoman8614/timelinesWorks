@@ -10,11 +10,9 @@ export const useFluxTimelineGeneration = () => {
     const [optimizationHistory, setOptimizationHistory] = useState([]);
     const [timelineVersion, setTimelineVersion] = useState(0);
     const [retryCount, setRetryCount] = useState(0);
-
     const historyBufferRef = useRef([]);
     const lastHistoryUpdateRef = useRef(0);
     const historyUpdateTimerRef = useRef(null);
-
     useEffect(() => {
         if (!optimizationInfo || !optimizationInfo.currentIteration) return;
 
@@ -84,9 +82,22 @@ export const useFluxTimelineGeneration = () => {
                 },
 
                 onComplete: (finalData) => {
-                    console.log('Flux генерация завершена');
                     const tl = finalData?.timeline || finalData;
-                    setTimeline(tl);
+                    const validations = finalData?.optimizationInformation?.best?.validations;
+                    if (tl && validations) {
+                        const timelineWithValidations = {
+                            ...tl,
+                            validations: validations
+                        };
+                        setTimeline(timelineWithValidations);
+                    } else {
+                        setTimeline(tl);
+                    }
+
+                    if (finalData?.optimizationInformation) {
+                        setOptimizationInfo(finalData.optimizationInformation);
+                    }
+
                     setTimelineVersion(v => v + 1);
                     setProgress('Генерация завершена');
                     setIsGenerating(false);
@@ -116,11 +127,19 @@ export const useFluxTimelineGeneration = () => {
         }
     }, []);
 
-    const cancelGeneration = useCallback(() => {
+    const [wasCancelled, setWasCancelled] = useState(false);
+
+    const cancelGenerationWithFlag = useCallback(() => {
+        setWasCancelled(true);
         fluxService.disconnect();
         setIsGenerating(false);
         setProgress('Отменено');
     }, []);
+
+    const generatePlanWrapper = useCallback(async (project, activePlan) => {
+        setWasCancelled(false);
+        return generatePlan(project, activePlan);
+    }, [generatePlan]);
 
     const clearError = useCallback(() => {
         setError(null);
@@ -135,8 +154,9 @@ export const useFluxTimelineGeneration = () => {
         optimizationHistory,
         timelineVersion,
         retryCount,
-        generatePlan,
-        cancelGeneration,
+        wasCancelled,
+        generatePlan: generatePlanWrapper,
+        cancelGeneration: cancelGenerationWithFlag,
         clearError,
         isConnected: fluxService.isConnected(),
     };

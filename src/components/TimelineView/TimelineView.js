@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Button, Space, DatePicker, Modal, Descriptions, Popconfirm, message, Tooltip } from 'antd';
-import { ZoomInOutlined, ZoomOutOutlined, ExpandOutlined, CompressOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { Button, Space, DatePicker, Modal, Descriptions, Popconfirm, message, Tooltip, Spin } from 'antd';
+import { ZoomInOutlined, ZoomOutOutlined, ExpandOutlined, CompressOutlined, QuestionCircleOutlined, DashboardOutlined } from '@ant-design/icons';
 import Timeline from 'react-timelines';
 import 'react-timelines/lib/css/style.css';
 import dayjs from 'dayjs';
@@ -9,9 +9,12 @@ import './TimelineView.css';
 import {
     buildAssemblyStateElements,
     buildUnitAssignmentElements,
-    buildMaintenanceEventElements
+    buildMaintenanceEventElements,
+    buildValidationErrorElements,
+    countValidationErrors
 } from '../../utils/timelineElementBuilders';
 import { applyDOMLocalization } from '../../utils/timelineLocalization';
+import operatingHoursApi from '../../services/api/operatingHoursApi';
 
 dayjs.locale('ru');
 
@@ -57,7 +60,7 @@ const groupOverlappingMaintenanceElements = (elements) => {
     return groups;
 };
 
-const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate, isGenerating }) => {
+const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate, isGenerating, projectId }) => {
     const [collapsedAssemblies, setCollapsedAssemblies] = useState(new Set());
     const [allExpanded, setAllExpanded] = useState(true);
     const [zoom, setZoom] = useState(30);
@@ -67,6 +70,9 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
     const [timelineEnd, setTimelineEnd] = useState(() => dayjs().endOf('month'));
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [eventModalVisible, setEventModalVisible] = useState(false);
+    const [operatingHoursDate, setOperatingHoursDate] = useState(dayjs());
+    const [operatingHoursData, setOperatingHoursData] = useState({}); // { date: { unitId: hours } }
+    const [loadingOperatingHours, setLoadingOperatingHours] = useState(false);
 
     useEffect(() => {
         const observer = applyDOMLocalization();
@@ -145,39 +151,45 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
         };
 
         if (timelineData.assemblyStates) {
-            Object.values(timelineData.assemblyStates).forEach(states => {
-                if (Array.isArray(states)) {
-                    states.forEach(state => {
-                        if (state.dateTime) {
-                            const date = new Date(state.dateTime);
-                            allStartDates.push(date);
-                            allEndDates.push(date);
-                        }
-                    });
+            const states = Array.isArray(timelineData.assemblyStates)
+                ? timelineData.assemblyStates
+                : Object.values(timelineData.assemblyStates).flat();
+
+            states.forEach(state => {
+                if (state?.dateTime) {
+                    const date = new Date(state.dateTime);
+                    if (!isNaN(date.getTime())) {
+                        allStartDates.push(date);
+                        allEndDates.push(date);
+                    }
                 }
             });
         }
 
-        if (timelineData.unitAssignments) {
+        if (timelineData.unitAssignments && Array.isArray(timelineData.unitAssignments)) {
             timelineData.unitAssignments.forEach(ua => {
                 if (ua.dateTime) {
                     const date = new Date(ua.dateTime);
-                    allStartDates.push(date);
-                    allEndDates.push(date);
+                    if (!isNaN(date.getTime())) {
+                        allStartDates.push(date);
+                        allEndDates.push(date);
+                    }
                 }
             });
         }
 
-        if (timelineData.maintenanceEvents) {
+        if (timelineData.maintenanceEvents && Array.isArray(timelineData.maintenanceEvents)) {
             timelineData.maintenanceEvents.forEach(me => {
                 if (me.dateTime) {
                     const startDate = new Date(me.dateTime);
-                    allStartDates.push(startDate);
+                    if (!isNaN(startDate.getTime())) {
+                        allStartDates.push(startDate);
 
-                    const mt = findMaintenanceType(me.maintenanceTypeId);
-                    const duration = mt?.duration || 1; // дней
-                    const endDate = new Date(startDate.getTime() + duration * 24 * 60 * 60 * 1000);
-                    allEndDates.push(endDate);
+                        const mt = findMaintenanceType(me.maintenanceTypeId);
+                        const duration = mt?.duration || 1;
+                        const endDate = new Date(startDate.getTime() + duration * 24 * 60 * 60 * 1000);
+                        allEndDates.push(endDate);
+                    }
                 }
             });
         }
@@ -188,77 +200,46 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
         const maxDate = new Date(Math.max(...allEndDates.map(d => d.getTime())));
 
         return {
-            start: dayjs(minDate).subtract(3, 'day').startOf('day'),
-            end: dayjs(maxDate).add(3, 'day').endOf('day')
+            start: dayjs(minDate).startOf('day'),
+            end: dayjs(maxDate).endOf('day')
         };
     }, [parsedStructure]);
-
-    const ensureTodayIncluded = useCallback((start, end) => {
-        const today = dayjs();
-        let newStart = start;
-        let newEnd = end;
-
-        if (today.isBefore(start, 'day')) {
-            newStart = today.startOf('month');
-        }
-
-        if (today.isAfter(end, 'day')) {
-            newEnd = today.endOf('month');
-        }
-
-        return { start: newStart, end: newEnd };
-    }, []);
 
     useEffect(() => {
         const today = dayjs();
         let finalStart = today.startOf('month');
         let finalEnd = today.endOf('month');
 
+        if (selectedPlan?.startTime && selectedPlan?.endTime) {
+            finalStart = dayjs(selectedPlan.startTime);
+            finalEnd = dayjs(selectedPlan.endTime);
+        } else {
+            const projectRange = calculateTimelineRange(timeline);
+
+            if (projectRange) {
+                finalStart = projectRange.start;
+                finalEnd = projectRange.end;
+            } else {}
+        }
+
+        if (today.isBefore(finalStart, 'day')) {
+            finalStart = today.startOf('month');
+        }
+        if (today.isAfter(finalEnd, 'day')) {
+            finalEnd = today.endOf('month');
+        }
+
+        setTimelineStart(finalStart);
+        setTimelineEnd(finalEnd);
+    }, [selectedPlan?.id, selectedPlan?.startTime, selectedPlan?.endTime, timeline, calculateTimelineRange]);
+
+    const minStartDate = useMemo(() => {
         const projectRange = calculateTimelineRange(timeline);
-
         if (projectRange) {
-            finalStart = projectRange.start;
-            finalEnd = projectRange.end;
+            return projectRange.start;
         }
-
-        if (selectedPlan) {
-            let planTimeline = selectedPlan.timeline;
-            if (typeof planTimeline === 'string') {
-                try {
-                    planTimeline = JSON.parse(planTimeline);
-                } catch (e) {
-                    planTimeline = null;
-                }
-            }
-
-            const planRange = planTimeline ? calculateTimelineRange(planTimeline) : null;
-
-            if (planRange) {
-                if (planRange.start.isBefore(finalStart)) {
-                    finalStart = planRange.start;
-                }
-                if (planRange.end.isAfter(finalEnd)) {
-                    finalEnd = planRange.end;
-                }
-            }
-
-            if (selectedPlan.startTime) {
-                const planStart = dayjs(selectedPlan.startTime);
-                if (planStart.isBefore(finalStart)) {
-                    finalStart = planStart;
-                }
-            }
-            if (selectedPlan.endTime) {
-                const planEnd = dayjs(selectedPlan.endTime);
-                if (planEnd.isAfter(finalEnd)) {
-                    finalEnd = planEnd;
-                }
-            }
-        }
-        const { start: adjustedStart, end: adjustedEnd } = ensureTodayIncluded(finalStart, finalEnd);
-        setTimelineStart(adjustedStart);
-        setTimelineEnd(adjustedEnd);
-    }, [selectedPlan?.id, selectedPlan?.startTime, selectedPlan?.endTime, selectedPlan?.timeline, timeline, calculateTimelineRange, ensureTodayIncluded]);
+        return null;
+    }, [timeline, calculateTimelineRange]);
 
     const zoomIn = useCallback(() => {
         setZoom(prev => Math.min(prev + 2, zoomMax));
@@ -302,6 +283,79 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
         setAllExpanded(!allExpanded);
     }, [allExpanded, parsedStructure]);
 
+    const loadOperatingHours = useCallback(async () => {
+
+        if (!projectId && !selectedPlan?.id) {
+            message.warning('Нет проекта для загрузки наработок');
+            return;
+        }
+
+        setLoadingOperatingHours(true);
+        try {
+            const dateKey = operatingHoursDate.format('YYYY-MM-DD');
+            const dateTime = dateKey + 'T00:00:00';
+
+            const requestProjectId = selectedPlan?.id ? null : projectId;
+            const requestPlanId = selectedPlan?.id || null;
+
+            console.log('📡 Отправляем запрос:', { requestProjectId, requestPlanId, dateTime });
+
+            const data = await operatingHoursApi.getOperatingHours(
+                requestProjectId,
+                requestPlanId,
+                dateTime
+            );
+
+            const hoursMap = {};
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    hoursMap[item.unitId] = item.operatingHours;
+                });
+            }
+
+            setOperatingHoursData(prev => ({
+                ...prev,
+                [dateKey]: hoursMap
+            }));
+
+            message.success(`Наработки загружены на ${operatingHoursDate.format('DD.MM.YYYY')}`);
+        } catch (error) {
+            message.error('Ошибка загрузки наработок');
+        } finally {
+            setLoadingOperatingHours(false);
+        }
+    }, [projectId, selectedPlan?.id, operatingHoursDate]);
+
+    const clearOperatingHours = useCallback(() => {
+        setOperatingHoursData({});
+    }, []);
+
+    const getCurrentUnitForComponent = useCallback((assemblyId, componentId) => {
+        const assignments = timeline?.unitAssignments?.filter(ua =>
+            ua.componentOfAssembly?.assemblyId === assemblyId &&
+            ua.componentOfAssembly?.componentPath?.includes(componentId)
+        ) || [];
+
+        if (assignments.length === 0) return null;
+
+        const targetDate = operatingHoursDate.toDate();
+        const sortedAssignments = [...assignments].sort((a, b) =>
+            new Date(a.dateTime) - new Date(b.dateTime)
+        );
+
+        let currentUnit = null;
+        for (const assignment of sortedAssignments) {
+            const assignmentDate = new Date(assignment.dateTime);
+            if (assignmentDate <= targetDate) {
+                currentUnit = assignment.unitId;
+            } else {
+                break;
+            }
+        }
+
+        return currentUnit;
+    }, [timeline, operatingHoursDate]);
+
     const getUnitById = useCallback((unitId) => {
         if (!parsedStructure?.partModels) return null;
         for (const partModel of parsedStructure.partModels) {
@@ -323,6 +377,9 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
     const getMaintenanceStats = useCallback((assemblyId, componentId) => {
         const stats = {};
 
+        const visibleStart = timelineStart.toDate();
+        const visibleEnd = timelineEnd.toDate();
+
         const assignments = timeline?.unitAssignments?.filter(ua => {
             if (ua.componentOfAssembly?.assemblyId !== assemblyId) return false;
             const path = ua.componentOfAssembly?.componentPath;
@@ -333,17 +390,25 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
 
         (timeline?.maintenanceEvents || []).forEach(event => {
             if (unitIds.includes(event.unitId)) {
+                const eventStart = new Date(event.dateTime);
                 const mt = getMaintenanceType(event.maintenanceTypeId);
-                const name = mt?.name || event.maintenanceTypeId;
-                stats[name] = (stats[name] || 0) + 1;
+                const duration = mt?.duration || 1;
+                const eventEnd = new Date(eventStart.getTime() + duration * 24 * 60 * 60 * 1000);
+                if (eventStart <= visibleEnd && eventEnd >= visibleStart) {
+                    const name = mt?.name || event.maintenanceTypeId;
+                    stats[name] = (stats[name] || 0) + 1;
+                }
             }
         });
 
         return stats;
-    }, [timeline, getMaintenanceType]);
+    }, [timeline, getMaintenanceType, timelineStart, timelineEnd]);
 
     const getAssemblyMaintenanceStats = useCallback((assemblyId) => {
         const stats = {};
+
+        const visibleStart = timelineStart.toDate();
+        const visibleEnd = timelineEnd.toDate();
         const assignments = timeline?.unitAssignments?.filter(ua =>
             ua.componentOfAssembly?.assemblyId === assemblyId
         ) || [];
@@ -352,14 +417,19 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
 
         (timeline?.maintenanceEvents || []).forEach(event => {
             if (unitIds.includes(event.unitId)) {
+                const eventStart = new Date(event.dateTime);
                 const mt = getMaintenanceType(event.maintenanceTypeId);
-                const name = mt?.name || event.maintenanceTypeId;
-                stats[name] = (stats[name] || 0) + 1;
+                const duration = mt?.duration || 1;
+                const eventEnd = new Date(eventStart.getTime() + duration * 24 * 60 * 60 * 1000);
+                if (eventStart <= visibleEnd && eventEnd >= visibleStart) {
+                    const name = mt?.name || event.maintenanceTypeId;
+                    stats[name] = (stats[name] || 0) + 1;
+                }
             }
         });
 
         return stats;
-    }, [timeline, getMaintenanceType]);
+    }, [timeline, getMaintenanceType, timelineStart, timelineEnd]);
 
     const renderMaintenanceTooltip = useCallback((stats, name = '') => {
         const entries = Object.entries(stats);
@@ -461,7 +531,7 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
     const tracks = useMemo(() => {
         const result = [];
 
-        const buildTrackTitle = (name, level, itemType, itemId, parentAssemblyId, isOpen) => {
+        const buildTrackTitle = (name, level, itemType, itemId, parentAssemblyId, isOpen, errorCount = 0) => {
             const indent = level * 24;
 
             let maintenanceStats = null;
@@ -476,6 +546,13 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
             const typeIcon = itemType === 'NODE' ? '' : itemType === 'ASSEMBLY' ? '' : '';
             const iconColor = itemType === 'NODE' ? '#1677ff' : itemType === 'ASSEMBLY' ? '#52c41a' : '#8c8c8c';
 
+            const renderNodeTooltip = () => (
+                <div>
+                    <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Информация об узле:</div>
+                    <div>Нарушений: <span style={{ color: errorCount > 0 ? '#ff4d4f' : '#52c41a' }}>{errorCount}</span></div>
+                </div>
+            );
+
             return (
                 <div style={{
                     display: 'flex',
@@ -485,6 +562,20 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
                 }}>
                     <span style={{ color: iconColor, fontSize: 12 }}>{typeIcon}</span>
                     <span>{name}</span>
+                    {itemType === 'NODE' && (
+                        <Tooltip
+                            title={renderNodeTooltip()}
+                            placement="right"
+                        >
+                            <QuestionCircleOutlined
+                                style={{
+                                    color: errorCount > 0 ? '#ff4d4f' : '#d9d9d9',
+                                    cursor: 'help',
+                                    fontSize: 12
+                                }}
+                            />
+                        </Tooltip>
+                    )}
                     {(itemType === 'ASSEMBLY' || itemType === 'COMPONENT') && (
                         <Tooltip
                             title={renderMaintenanceTooltip(maintenanceStats || {})}
@@ -508,27 +599,38 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
 
             items.forEach(item => {
                 if (item.type === 'NODE') {
-                    let nameWithConstraints = item.name;
-                    if (item.constraints && item.constraints.length > 0) {
-                        const workingConstraint = item.constraints.find(c => c.type === 'REQUIRED_WORKING');
-                        const maintenanceConstraint = item.constraints.find(c => c.type === 'MAX_MAINTENANCE');
+                    let nameWithConditions = item.name;
 
-                        const minWorking = workingConstraint?.requiredWorking ?? 0;
-                        const maxMaintenance = maintenanceConstraint?.maxUnderMaintenance ?? 0;
+                    const conditions = item.conditions || [];
+                    if (conditions.length > 0) {
+                        const workingCondition = conditions.find(c => c.type === 'REQUIRED_WORKING');
+                        const maintenanceCondition = conditions.find(c => c.type === 'MAX_MAINTENANCE');
+
+                        const minWorking = workingCondition?.requiredWorking ?? 0;
+                        const maxMaintenance = maintenanceCondition?.maxUnderMaintenance ?? 0;
 
                         if (minWorking > 0 || maxMaintenance > 0) {
-                            nameWithConstraints = `${item.name} (Раб: ${minWorking}; На ТО: ${maxMaintenance})`;
+                            nameWithConditions = `${item.name} (Р: ${minWorking}; ТО: ${maxMaintenance})`;
                         }
                     }
 
+                    const errorCount = countValidationErrors(timeline?.validations, item.id);
+
+                    const validationElements = buildValidationErrorElements(
+                        timeline?.validations,
+                        item.id,
+                        timelineStart.toDate(),
+                        timelineEnd.toDate()
+                    );
+
                     result.push({
                         id: item.id,
-                        title: buildTrackTitle(nameWithConstraints, level, 'NODE', item.id, null, true),
+                        title: buildTrackTitle(nameWithConditions, level, 'NODE', item.id, null, true, errorCount),
                         level: level,
                         itemType: 'NODE',
                         itemId: item.id,
                         hasChildren: item.children && item.children.length > 0,
-                        elements: [],
+                        elements: validationElements,
                         isOpen: true
                     });
 
@@ -685,6 +787,43 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
                                     endDate
                                 );
 
+                                const currentUnitId = getCurrentUnitForComponent(item.id, component.id);
+
+                                const operatingHoursElements = [];
+                                if (currentUnitId) {
+                                    Object.entries(operatingHoursData).forEach(([dateKey, hoursMap]) => {
+                                        const hours = hoursMap[currentUnitId];
+                                        if (hours !== undefined && hours !== null) {
+                                            const ohDate = new Date(dateKey + 'T00:00:00');
+                                            const ohDateEnd = new Date(dateKey + 'T23:59:59');
+
+                                            operatingHoursElements.push({
+                                                id: `oh-${item.id}-${component.id}-${currentUnitId}-${dateKey}`,
+                                                title: String(Math.round(hours)),
+                                                tooltip: `Наработка на ${dayjs(dateKey).format('DD.MM.YYYY')}: ${hours.toLocaleString('ru-RU')} ч`,
+                                                start: ohDate,
+                                                end: ohDateEnd,
+                                                style: {
+                                                    backgroundColor: 'transparent',
+                                                    color: '#000000',
+                                                    border: 'none',
+                                                    fontWeight: '600',
+                                                    fontSize: '10px',
+                                                    textAlign: 'center',
+                                                    zIndex: 200,
+                                                    lineHeight: '1'
+                                                },
+                                                meta: {
+                                                    kind: 'operatingHours',
+                                                    unitId: currentUnitId,
+                                                    hours: hours,
+                                                    date: dateKey
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+
                                 result.push({
                                     id: `${item.id}-${component.id}`,
                                     title: buildTrackTitle(componentName, level + 1, 'COMPONENT', component.id, item.id, false),
@@ -692,7 +831,7 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
                                     itemType: 'COMPONENT',
                                     itemId: component.id,
                                     parentAssemblyId: item.id,
-                                    elements: [...assignmentElements, ...maintenanceElements],
+                                    elements: [...assignmentElements, ...maintenanceElements, ...operatingHoursElements],
                                     hasChildren: false,
                                     isOpen: false
                                 });
@@ -708,7 +847,116 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
         }
 
         return result;
-    }, [parsedStructure, collapsedAssemblies, timeline, endDate, getUnitById, getMaintenanceType, getNodeConstraints, getMaintenanceStats, getAssemblyMaintenanceStats, renderMaintenanceTooltip]);
+    }, [parsedStructure, collapsedAssemblies, timeline, endDate, getUnitById, getMaintenanceType, getNodeConstraints, getMaintenanceStats, getAssemblyMaintenanceStats, renderMaintenanceTooltip, operatingHoursData, getCurrentUnitForComponent, timelineStart, timelineEnd]);
+
+    const invalidDates = useMemo(() => {
+        const allInvalidDates = [];
+        if (timeline?.validations && Array.isArray(timeline.validations)) {
+            timeline.validations.forEach(validation => {
+                if (validation.actualStates && Array.isArray(validation.actualStates)) {
+                    validation.actualStates
+                        .filter(state => state.valid === false)
+                        .forEach(state => {
+                            allInvalidDates.push({
+                                date: state.date,
+                                actual: state.actual,
+                                nodeId: validation.nodeId
+                            });
+                        });
+                }
+            });
+        }
+
+        if (timeline?.validation && Array.isArray(timeline.validation)) {
+            timeline.validation
+                .filter(v => v.valid === false)
+                .forEach(v => {
+                    allInvalidDates.push({
+                        date: v.date,
+                        actual: v.actual
+                    });
+                });
+        }
+
+        if (allInvalidDates.length === 0) {
+            return [];
+        }
+
+        const visibleStart = timelineStart.toDate();
+        const visibleEnd = timelineEnd.toDate();
+
+        const uniqueDates = new Map();
+        allInvalidDates.forEach(item => {
+            if (!uniqueDates.has(item.date)) {
+                uniqueDates.set(item.date, item);
+            }
+        });
+
+        return Array.from(uniqueDates.values())
+            .filter(v => {
+                const d = new Date(v.date);
+                return d >= visibleStart && d <= visibleEnd;
+            });
+    }, [timeline?.validations, timeline?.validation, timelineStart, timelineEnd]);
+
+    useEffect(() => {
+        const insertOverlays = () => {
+            const tracksGrid = document.querySelector('.rt-timeline__grid');
+            if (!tracksGrid) return;
+            const oldContainers = tracksGrid.querySelectorAll('.invalid-dates-overlay-container');
+            oldContainers.forEach(el => el.remove());
+            const oldOverlays = tracksGrid.querySelectorAll('.invalid-date-overlay');
+            oldOverlays.forEach(el => el.remove());
+
+            if (invalidDates.length === 0) return;
+
+            tracksGrid.style.position = 'relative';
+
+            const totalMs = endDate.getTime() - startDate.getTime();
+            const oneDayMs = 24 * 60 * 60 * 1000;
+
+            const overlayContainer = document.createElement('div');
+            overlayContainer.className = 'invalid-dates-overlay-container';
+            overlayContainer.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                pointer-events: none;
+                z-index: 5;
+            `;
+
+            invalidDates.forEach((item) => {
+                const dateStart = new Date(item.date);
+
+                const leftPercent = ((dateStart.getTime() - startDate.getTime()) / totalMs) * 100;
+                const widthPercent = (oneDayMs / totalMs) * 100;
+
+                const overlay = document.createElement('div');
+                overlay.className = 'invalid-date-overlay';
+                overlay.title = `Нарушение ограничений: ${item.date}\nРаботает: ${item.actual?.working || 0}`;
+                overlay.style.cssText = `
+                    position: absolute;
+                    left: ${leftPercent}%;
+                    width: ${widthPercent}%;
+                    top: 0;
+                    bottom: 0;
+                    background-color: rgba(255, 77, 79, 0.15);
+                    border-left: 1px dashed rgba(255, 77, 79, 0.5);
+                    pointer-events: auto;
+                    cursor: help;
+                `;
+
+                overlayContainer.appendChild(overlay);
+            });
+
+            tracksGrid.appendChild(overlayContainer);
+        };
+
+        const timeout = setTimeout(insertOverlays, 300);
+        return () => clearTimeout(timeout);
+    }, [invalidDates, startDate, endDate]);
 
     const handleElementClick = useCallback((element) => {
         if (!element?.meta) return;
@@ -911,6 +1159,12 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
                                 format="DD.MM.YYYY"
                                 placeholder="Дата начала"
                                 size="small"
+                                disabledDate={(current) => {
+                                    if (minStartDate && current && current.isBefore(minStartDate, 'day')) {
+                                        return true;
+                                    }
+                                    return false;
+                                }}
                             />
                         </Space>
 
@@ -990,6 +1244,48 @@ const TimelineView = ({ structure, timeline = {}, selectedPlan, onTimelineUpdate
                             Масштаб: {zoom}
                         </span>
                     </Space>
+                </div>
+
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginTop: 12,
+                    padding: '8px 12px',
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: 6
+                }}>
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>Наработки:</span>
+                    <DatePicker
+                        value={operatingHoursDate}
+                        onChange={(date) => date && setOperatingHoursDate(date)}
+                        format="DD.MM.YYYY"
+                        placeholder="Дата наработок"
+                        size="small"
+                        style={{ width: 130 }}
+                    />
+                    <Button
+                        size="small"
+                        type="primary"
+                        icon={<DashboardOutlined />}
+                        onClick={loadOperatingHours}
+                        loading={loadingOperatingHours}
+                    >
+                        Загрузить
+                    </Button>
+                    {Object.keys(operatingHoursData).length > 0 && (
+                        <>
+                            <span style={{ color: '#52c41a', fontSize: 12 }}>
+                                ✓ Даты: {Object.keys(operatingHoursData).map(d => dayjs(d).format('DD.MM')).join(', ')}
+                            </span>
+                            <Button
+                                size="small"
+                                onClick={clearOperatingHours}
+                            >
+                                Очистить все
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 

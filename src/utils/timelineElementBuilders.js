@@ -362,3 +362,92 @@ const groupOverlappingEvents = (events, getMaintenanceType) => {
 
     return groups;
 };
+
+/**
+ * Построение элементов ошибок валидации для конкретной ноды
+ * @param {Array} validations - массив validations из timeline
+ * @param {string} nodeId - ID ноды для фильтрации
+ * @param {Date} timelineStart - начало видимого диапазона
+ * @param {Date} timelineEnd - конец видимого диапазона
+ */
+export const buildValidationErrorElements = (validations, nodeId, timelineStart, timelineEnd) => {
+    if (!validations || !Array.isArray(validations) || !nodeId) {
+        return [];
+    }
+
+    const elements = [];
+
+    const nodeValidation = validations.find(v =>
+        v.validatedCondition?.nodeId === nodeId
+    );
+
+    if (!nodeValidation || !nodeValidation.actualStates) {
+        return [];
+    }
+
+    const condition = nodeValidation.validatedCondition?.condition;
+    const requiredWorking = condition?.requiredWorking || 0;
+
+    const falseStates = nodeValidation.actualStates.filter(state => state.valid === false);
+
+    falseStates.forEach((state, stateIndex) => {
+        const dateStart = new Date(state.date + 'T00:00:00');
+        const dateEnd = new Date(state.date + 'T23:59:59');
+
+        if (timelineStart && dateStart < timelineStart) return;
+        if (timelineEnd && dateEnd > timelineEnd) return;
+
+        const dateStr = dateStart.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'short'
+        });
+
+        const actual = state.actual?.working || 0;
+
+        elements.push({
+            id: `validation-error-${nodeId}-${stateIndex}-${state.date}`,
+            title: `${actual}`,
+            tooltip: `Нарушение: ${dateStr}\nРаботает: ${actual} (нужно: ${requiredWorking})`,
+            start: dateStart,
+            end: dateEnd,
+            style: {
+                backgroundColor: 'rgba(255, 77, 79, 0.4)',
+                color: '#ffffff',
+                border: '1px solid #ff4d4f',
+                borderRadius: '2px',
+                fontWeight: 'bold',
+                fontSize: '10px',
+                textAlign: 'center',
+                zIndex: 150
+            },
+            meta: {
+                kind: 'validationError',
+                date: state.date,
+                actual: state.actual,
+                nodeId: nodeId,
+                required: requiredWorking
+            }
+        });
+    });
+
+    return elements;
+};
+
+/**
+ * Подсчёт количества нарушений для ноды
+ */
+export const countValidationErrors = (validations, nodeId) => {
+    if (!validations || !Array.isArray(validations) || !nodeId) {
+        return 0;
+    }
+
+    const nodeValidation = validations.find(v =>
+        v.validatedCondition?.nodeId === nodeId
+    );
+
+    if (!nodeValidation || !nodeValidation.actualStates) {
+        return 0;
+    }
+
+    return nodeValidation.actualStates.filter(state => state.valid === false).length;
+};

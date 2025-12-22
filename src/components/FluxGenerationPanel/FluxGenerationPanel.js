@@ -13,6 +13,7 @@ const FluxGenerationPanel = ({ project, selectedPlan, onTimelineUpdate, onPlanSa
         timeline,
         optimizationInfo,
         optimizationHistory,
+        wasCancelled,
         generatePlan,
         cancelGeneration,
         clearError,
@@ -30,7 +31,7 @@ const FluxGenerationPanel = ({ project, selectedPlan, onTimelineUpdate, onPlanSa
 
     useEffect(() => {
         const saveGeneratedPlan = async () => {
-            if (wasGeneratingRef.current && !isGenerating && lastTimelineRef.current && selectedPlan) {
+            if (wasGeneratingRef.current && !isGenerating && !wasCancelled && lastTimelineRef.current && selectedPlan) {
                 try {
                     const updatedPlan = {
                         ...selectedPlan,
@@ -51,13 +52,15 @@ const FluxGenerationPanel = ({ project, selectedPlan, onTimelineUpdate, onPlanSa
                     console.error('Ошибка сохранения плана:', err);
                     message.error('Не удалось сохранить план: ' + (err.message || 'Неизвестная ошибка'));
                 }
+            } else if (wasGeneratingRef.current && !isGenerating && wasCancelled) {
+                console.log('Генерация отменена, план НЕ сохраняем');
             }
 
             wasGeneratingRef.current = isGenerating;
         };
 
         saveGeneratedPlan();
-    }, [isGenerating, selectedPlan, onPlanSaved]);
+    }, [isGenerating, wasCancelled, selectedPlan, onPlanSaved]);
 
     const handleGenerate = async () => {
         if (!selectedPlan) {
@@ -91,10 +94,6 @@ const FluxGenerationPanel = ({ project, selectedPlan, onTimelineUpdate, onPlanSa
             // size="small"
         >
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <OptimizationInfoDisplay
-                    optimizationInfo={optimizationInfo}
-                    optimizationHistory={optimizationHistory}
-                />
                 <Space>
                     <Button
                         type="primary"
@@ -123,6 +122,18 @@ const FluxGenerationPanel = ({ project, selectedPlan, onTimelineUpdate, onPlanSa
                         type="error"
                         closable
                         onClose={clearError}
+                        showIcon
+                    />
+                )}
+                <OptimizationInfoDisplay
+                    optimizationInfo={optimizationInfo}
+                    optimizationHistory={optimizationHistory}
+                />
+                {!selectedPlan && (
+                    <Alert
+                        message="Выберите план"
+                        description="Для генерации плана ТО необходимо выбрать план из таблицы выше"
+                        type="warning"
                         showIcon
                     />
                 )}

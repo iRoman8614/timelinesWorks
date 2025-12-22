@@ -26,9 +26,11 @@ const DraggableRow = ({ node, children, ...props }) => {
         ...props.style,
     };
 
+    // Клонируем children и добавляем dragHandle в первую колонку
     const childrenArray = React.Children.toArray(children);
     const modifiedChildren = childrenArray.map((child, index) => {
         if (index === 0) {
+            // Первая колонка - только handle
             return React.cloneElement(child, {
                 children: (
                     <span
@@ -104,15 +106,16 @@ const NodeStructureTree = ({
         return assemblyType ? assemblyType.name : 'Неизвестный тип';
     };
 
-    const getConstraintLabel = (constraint) => {
-        if (constraint.type === 'MAX_MAINTENANCE') {
-            return `Максимум на ТО: ${constraint.maxUnderMaintenance}`;
-        } else if (constraint.type === 'REQUIRED_WORKING') {
-            return `Число работающих: ${constraint.requiredWorking}`;
+    const getConditionLabel = (condition) => {
+        if (condition.type === 'MAX_MAINTENANCE') {
+            return `На ТО: ${condition.maxUnderMaintenance}`;
+        } else if (condition.type === 'REQUIRED_WORKING') {
+            return `Работающих: ${condition.requiredWorking}`;
         }
         return '';
     };
 
+    // Рекурсивный поиск узла по ID
     const findNodeById = (id, items) => {
         for (const item of items) {
             if (item.id === id) return item;
@@ -124,6 +127,7 @@ const NodeStructureTree = ({
         return null;
     };
 
+    // Поиск узла в плоском массиве или дереве
     const findNodeInTree = (id, items) => {
         return findNodeById(id, items);
     };
@@ -132,15 +136,16 @@ const NodeStructureTree = ({
         {
             title: '',
             key: 'drag',
-            width: '5%',
-            render: () => null,
+            width: '40px',
+            render: () => null, // Контент будет добавлен через DraggableRow
         },
         {
             title: 'Название',
             dataIndex: 'name',
             key: 'name',
-            width: '30%',
+            width: '35%',
             render: (text, record) => {
+                // Вычисляем уровень вложенности
                 const getLevel = (node, nodes, level = 0) => {
                     if (!node.parentId) return level;
                     const parent = findNodeInTree(node.parentId, nodes);
@@ -149,7 +154,7 @@ const NodeStructureTree = ({
                 };
 
                 const level = getLevel(record, nodes);
-                const indent = level * 24;
+                const indent = level * 24; // 24px на уровень
 
                 const content = record.type === 'ASSEMBLY' ? (
                     <span>
@@ -166,16 +171,16 @@ const NodeStructureTree = ({
         },
         {
             title: 'Ограничения',
-            dataIndex: 'constraints',
-            key: 'constraints',
+            dataIndex: 'conditions',
+            key: 'conditions',
             width: '35%',
-            render: (constraints, record) => {
-                if (record.type === 'NODE' && constraints && constraints.length > 0) {
+            render: (conditions, record) => {
+                if (record.type === 'NODE' && conditions && conditions.length > 0) {
                     return (
                         <Space wrap>
-                            {constraints.map(constraint => (
-                                <Tag key={constraint.id} color="blue">
-                                    {getConstraintLabel(constraint)}
+                            {conditions.map((condition, index) => (
+                                <Tag key={index} color="blue">
+                                    {getConditionLabel(condition)}
                                 </Tag>
                             ))}
                         </Space>
@@ -187,7 +192,7 @@ const NodeStructureTree = ({
         {
             title: 'Действия',
             key: 'actions',
-            width: '30%',
+            width: '20%',
             render: (_, record) => (
                 <Space>
                     <Button
@@ -234,6 +239,7 @@ const NodeStructureTree = ({
 
     return (
         <div className="node-structure-tree">
+            <h3>Структура узлов ({nodes.length})</h3>
             <Table
                 columns={columns}
                 dataSource={nodes}
@@ -273,7 +279,7 @@ const NodeStructureTree = ({
                         ) : (
                             <span style={{ marginRight: 8, width: 14, display: 'inline-block' }} />
                         ),
-                    indentSize: 0,
+                    indentSize: 0,  // Убираем автоматический отступ
                     childrenColumnName: 'children'
                 }}
                 locale={{
@@ -281,7 +287,6 @@ const NodeStructureTree = ({
                 }}
                 scroll={{ y: 'calc(100vh - 400px)' }}
             />
-            <p>Структура узлов ({nodes.length})</p>
         </div>
     );
 };

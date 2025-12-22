@@ -34,7 +34,7 @@ class FluxService {
 
         this.abortController = new AbortController();
 
-        const url = `${API_BASE}/api/optimizer/flux?start=${startDate}&end=${endDate}`;
+        const url = `${API_BASE}/api/optimizer/flux?start=${startDate}&end=${endDate}&sampleIntervalMs=1000`;
 
         let lastTimeline = null;
         let lastOptimizationInfo = null;
@@ -127,6 +127,7 @@ class FluxService {
                         }
 
                         const eventType = event.event || payload?.event;
+                        const isImplicitUpdate = !eventType && (payload?.plan || payload?.optimizationInformation);
 
                         if (eventType === 'progress') {
                             const msg =
@@ -137,14 +138,21 @@ class FluxService {
                             return;
                         }
 
-                        if (eventType === 'timeline-update' || eventType === 'optimization-update') {
+                        if (eventType === 'timeline-update' || eventType === 'optimization-update' || isImplicitUpdate) {
                             const plan = payload.plan || payload;
                             const tl = plan.timeline
                                 ? normalizeAsTimeline({ timeline: plan.timeline })
                                 : normalizeAsTimeline(plan);
 
                             if (tl) {
+                                const validations = payload.optimizationInformation?.best?.validations;
+                                if (validations) {
+                                    tl.validations = validations;
+                                }
+
                                 lastTimeline = tl;
+                                console.log('Timeline update:', tl.maintenanceEvents?.length || 0, 'событий',
+                                    tl.validations ? `(${tl.validations.length} validations)` : '');
                                 onTimelineUpdate(tl);
                             }
 
@@ -167,6 +175,12 @@ class FluxService {
                             const tl = plan.timeline
                                 ? normalizeAsTimeline({ timeline: plan.timeline })
                                 : normalizeAsTimeline(plan);
+                            if (tl) {
+                                const validations = payload.optimizationInformation?.best?.validations;
+                                if (validations) {
+                                    tl.validations = validations;
+                                }
+                            }
 
                             lastTimeline = tl;
 
@@ -176,7 +190,11 @@ class FluxService {
                             }
 
                             completionReceived = true;
-                            onComplete(tl || lastTimeline);
+                            antMessage.success('Оптимизация завершена успешно!');
+                            onComplete({
+                                timeline: tl || lastTimeline,
+                                optimizationInformation: payload.optimizationInformation || lastOptimizationInfo
+                            });
                             return;
                         }
 
@@ -203,7 +221,6 @@ class FluxService {
                     this.retryCount++;
 
                     if (this.retryCount <= this.maxRetries) {
-                        const delay = this.retryDelay * this.retryCount;
                         onRetry(this.retryCount);
                         onProgress(`Переподключение... (попытка ${this.retryCount}/${this.maxRetries})`);
 
@@ -222,7 +239,6 @@ class FluxService {
                 },
 
                 onclose: () => {
-                    console.log('🔌 SSE соединение закрыто');
                     if (!completionReceived) {
                         if (lastTimeline && messageCount > 0) {
                             console.log('Соединение закрылось без события complete, используем последний таймлайн');
@@ -253,7 +269,7 @@ class FluxService {
                 antMessage.error(`Ошибка оптимизации: ${error.message}`);
                 onError(error);
             } else {
-                console.log('lux соединение отменено пользователем');
+                console.log('Flux соединение отменено пользователем');
                 antMessage.info('Оптимизация отменена');
             }
         }
@@ -285,17 +301,27 @@ class FluxService {
                 throw new Error('У плана отсутствует дата окончания');
             }
 
-            const requestBody = JSON.parse(project.structure)
+            let parsedStructure = {};
+            if (project.structure) {
+                try {
+                    parsedStructure = typeof project.structure === 'string'
+                        ? JSON.parse(project.structure)
+                        : project.structure;
+                } catch (e) {
+                    console.error('Ошибка парсинга structure:', e);
+                }
+            }
 
-            console.log('Отправляем в Flux:', {
-                projectId,
-                hasStructure: !!requestBody.structure,
-                structureType: typeof requestBody.structure,
-                startDate,
-                endDate,
-                requestBody,
-                project: JSON.parse(project.structure)
-            });
+            const requestBody = {
+                id: project.id,
+                name: project.name,
+                historyUpdatedAt: project.historyUpdatedAt,
+                assemblyTypes: parsedStructure.assemblyTypes || [],
+                componentTypes: parsedStructure.componentTypes || [],
+                partModels: parsedStructure.partModels || [],
+                nodes: parsedStructure.nodes || [],
+                timeline: parsedStructure.timeline || {}
+            };
 
             await this.connectToFlux(projectId, startDate, endDate, requestBody, callbacks);
         } catch (error) {

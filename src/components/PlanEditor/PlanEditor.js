@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Modal, DatePicker, Alert, Upload, message, Button } from 'antd';
+import { Row, Col, Modal, DatePicker, Alert, Upload, message, Button, Space } from 'antd';
 import { DownloadOutlined, UploadOutlined, FileExcelOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -41,6 +41,10 @@ const PlanEditor = ({ projectId, project, onPlanSelect }) => {
 
     useEffect(() => {
         if (projectId) {
+            const planIdFromUrl = searchParams.get('planId');
+            if (planIdFromUrl) {
+                setSearchParams({}, { replace: true });
+            }
             loadPlans();
         }
     }, [projectId]);
@@ -50,34 +54,6 @@ const PlanEditor = ({ projectId, project, onPlanSelect }) => {
         try {
             const data = await planApi.getAll(projectId);
             setPlans(data);
-
-            const planIdFromUrl = searchParams.get('planId');
-
-            if (planIdFromUrl) {
-                const planFromUrl = data.find(p => p.id === planIdFromUrl);
-                if (planFromUrl) {
-                    setSelectedPlan(planFromUrl);
-                    if (onPlanSelect) {
-                        onPlanSelect(planFromUrl);
-                    }
-                } else {
-                    if (data.length > 0) {
-                        setSelectedPlan(data[0]);
-                        setSearchParams({ planId: data[0].id }, { replace: true });
-                        if (onPlanSelect) {
-                            onPlanSelect(data[0]);
-                        }
-                    }
-                }
-            } else {
-                if (data.length > 0) {
-                    setSelectedPlan(data[0]);
-                    setSearchParams({ planId: data[0].id }, { replace: true });
-                    if (onPlanSelect) {
-                        onPlanSelect(data[0]);
-                    }
-                }
-            }
         } catch (error) {
             console.error('Error loading plans:', error);
         } finally {

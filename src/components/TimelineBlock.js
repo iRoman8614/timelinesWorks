@@ -27,7 +27,11 @@ const TimelineBlock = ({ project, onProjectUpdate }) => {
 
     const handlePlanSelect = (plan) => {
         setSelectedPlan(plan);
-        setCurrentTimeline(null);
+        if (plan?.timeline && typeof plan.timeline === 'object') {
+            setCurrentTimeline(plan.timeline);
+        } else {
+            setCurrentTimeline(null);
+        }
     };
 
     const handleTimelineUpdate = async (newTimeline) => {
@@ -66,27 +70,29 @@ const TimelineBlock = ({ project, onProjectUpdate }) => {
             return currentTimeline;
         }
         if (selectedPlan?.timeline) {
+            if (typeof selectedPlan.timeline === 'object' && selectedPlan.timeline !== null) {
+                return selectedPlan.timeline;
+            }
             try {
-                return typeof selectedPlan.timeline === 'string'
-                    ? JSON.parse(selectedPlan.timeline)
-                    : selectedPlan.timeline;
+                return JSON.parse(selectedPlan.timeline);
             } catch (error) {
                 console.error('Ошибка парсинга timeline плана:', error);
             }
         }
 
-        if (project?.timeline) {
+        if (structure?.timeline) {
+            if (typeof structure.timeline === 'object' && structure.timeline !== null) {
+                return structure.timeline;
+            }
             try {
-                return typeof project.timeline === 'string'
-                    ? JSON.parse(project.timeline)
-                    : project.timeline;
+                return JSON.parse(structure.timeline);
             } catch (error) {
-                console.error('Ошибка парсинга timeline проекта:', error);
+                console.error('Ошибка парсинга timeline структуры:', error);
             }
         }
 
         return {};
-    }, [selectedPlan, project, currentTimeline]);
+    }, [selectedPlan, selectedPlan?.timeline, structure, currentTimeline]);
 
     return (
         <div className="timeline-block">
@@ -127,6 +133,7 @@ const TimelineBlock = ({ project, onProjectUpdate }) => {
                     selectedPlan={selectedPlan}
                     onTimelineUpdate={handleTimelineUpdate}
                     isGenerating={isGenerating}
+                    projectId={project?.id}
                 />
             </div>
         </div>
