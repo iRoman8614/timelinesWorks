@@ -8,7 +8,7 @@
     height: 500px;
     display: flex;
     flex-direction: column;
-    overflow: scroll;
+    overflow: auto;
 }
 
 .node-form h3,
@@ -24,7 +24,7 @@
 
 .node-structure-tree .ant-table-wrapper {
     flex: 1;
-    overflow: scroll;
+    overflow: auto;
     display: flex;
     flex-direction: column;
 }

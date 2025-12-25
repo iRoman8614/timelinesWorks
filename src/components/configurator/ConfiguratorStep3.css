@@ -9,7 +9,7 @@
     height: 500px;
     display: flex;
     flex-direction: column;
-    overflow: scroll;
+    overflow: auto;
 }
 
 .part-model-form h3,
@@ -26,7 +26,7 @@
 
 .part-model-table .ant-table-wrapper {
     flex: 1;
-    overflow: scroll;
+    overflow: auto;
     display: flex;
     flex-direction: column;
 }

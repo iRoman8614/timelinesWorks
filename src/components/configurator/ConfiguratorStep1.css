@@ -9,7 +9,7 @@
 
 .configurator-step .ant-row {
     flex: 1;
-    overflow: scroll;
+    overflow: auto;
 }
 
 .configurator-step .ant-col {
@@ -27,7 +27,7 @@
     height: 500px;
     display: flex;
     flex-direction: column;
-    overflow: scroll;
+    overflow: auto;
 }
 
 .component-type-form h3,

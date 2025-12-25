@@ -365,6 +365,7 @@ const groupOverlappingEvents = (events, getMaintenanceType) => {
 
 /**
  * Построение элементов ошибок валидации для конкретной ноды
+ * Объединяет REQUIRED_WORKING и MAX_MAINTENANCE на одну дату
  * @param {Array} validations - массив validations из timeline
  * @param {string} nodeId - ID ноды для фильтрации
  * @param {Date} timelineStart - начало видимого диапазона
@@ -375,24 +376,46 @@ export const buildValidationErrorElements = (validations, nodeId, timelineStart,
         return [];
     }
 
-    const elements = [];
-
-    const nodeValidation = validations.find(v =>
+    const nodeValidations = validations.filter(v =>
         v.validatedCondition?.nodeId === nodeId
     );
 
-    if (!nodeValidation || !nodeValidation.actualStates) {
+    if (nodeValidations.length === 0) {
         return [];
     }
 
-    const condition = nodeValidation.validatedCondition?.condition;
-    const requiredWorking = condition?.requiredWorking || 0;
+    const errorsByDate = {};
 
-    const falseStates = nodeValidation.actualStates.filter(state => state.valid === false);
+    nodeValidations.forEach(validation => {
+        const condition = validation.validatedCondition?.condition;
+        const conditionType = condition?.type;
 
-    falseStates.forEach((state, stateIndex) => {
-        const dateStart = new Date(state.date + 'T00:00:00');
-        const dateEnd = new Date(state.date + 'T23:59:59');
+        validation.actualStates?.forEach(state => {
+            if (state.valid === false) {
+                if (!errorsByDate[state.date]) {
+                    errorsByDate[state.date] = {};
+                }
+
+                if (conditionType === 'REQUIRED_WORKING') {
+                    errorsByDate[state.date].working = {
+                        actual: state.actual?.working || 0,
+                        required: condition?.requiredWorking || 0
+                    };
+                } else if (conditionType === 'MAX_MAINTENANCE') {
+                    errorsByDate[state.date].maintenance = {
+                        actual: state.actual?.underMaintenance || 0,
+                        max: condition?.maxUnderMaintenance || 0
+                    };
+                }
+            }
+        });
+    });
+
+    const elements = [];
+
+    Object.entries(errorsByDate).forEach(([date, errors], index) => {
+        const dateStart = new Date(date + 'T00:00:00');
+        const dateEnd = new Date(date + 'T23:59:59');
 
         if (timelineStart && dateStart < timelineStart) return;
         if (timelineEnd && dateEnd > timelineEnd) return;
@@ -402,17 +425,28 @@ export const buildValidationErrorElements = (validations, nodeId, timelineStart,
             month: 'short'
         });
 
-        const actual = state.actual?.working || 0;
+        const titleParts = [];
+        const tooltipParts = [`Нарушение: ${dateStr}`];
+
+        if (errors.working) {
+            titleParts.push(`Р:${errors.working.actual}`);
+            tooltipParts.push(`Работает: ${errors.working.actual} (нужно: ${errors.working.required})`);
+        }
+
+        if (errors.maintenance) {
+            titleParts.push(`ТО:${errors.maintenance.actual}`);
+            tooltipParts.push(`На ТО: ${errors.maintenance.actual} (макс: ${errors.maintenance.max})`);
+        }
 
         elements.push({
-            id: `validation-error-${nodeId}-${stateIndex}-${state.date}`,
-            title: `${actual}`,
-            tooltip: `Нарушение: ${dateStr}\nРаботает: ${actual} (нужно: ${requiredWorking})`,
+            id: `validation-error-${nodeId}-${index}-${date}`,
+            title: titleParts.join(' '),
+            tooltip: tooltipParts.join('\n'),
             start: dateStart,
             end: dateEnd,
             style: {
                 backgroundColor: 'rgba(255, 77, 79, 0.4)',
-                color: '#ffffff',
+                color: '#000000',
                 border: '1px solid #ff4d4f',
                 borderRadius: '2px',
                 fontWeight: 'bold',
@@ -422,10 +456,9 @@ export const buildValidationErrorElements = (validations, nodeId, timelineStart,
             },
             meta: {
                 kind: 'validationError',
-                date: state.date,
-                actual: state.actual,
-                nodeId: nodeId,
-                required: requiredWorking
+                date: date,
+                errors: errors,
+                nodeId: nodeId
             }
         });
     });
@@ -434,20 +467,26 @@ export const buildValidationErrorElements = (validations, nodeId, timelineStart,
 };
 
 /**
- * Подсчёт количества нарушений для ноды
+ * Подсчёт количества нарушений для ноды (уникальные даты)
  */
 export const countValidationErrors = (validations, nodeId) => {
     if (!validations || !Array.isArray(validations) || !nodeId) {
         return 0;
     }
 
-    const nodeValidation = validations.find(v =>
+    const errorDates = new Set();
+
+    const nodeValidations = validations.filter(v =>
         v.validatedCondition?.nodeId === nodeId
     );
 
-    if (!nodeValidation || !nodeValidation.actualStates) {
-        return 0;
-    }
+    nodeValidations.forEach(validation => {
+        validation.actualStates?.forEach(state => {
+            if (state.valid === false) {
+                errorDates.add(state.date);
+            }
+        });
+    });
 
-    return nodeValidation.actualStates.filter(state => state.valid === false).length;
+    return errorDates.size;
 };

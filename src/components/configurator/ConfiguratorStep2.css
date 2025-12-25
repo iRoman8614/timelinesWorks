@@ -8,7 +8,7 @@
     border: 1px solid #f0f0f0;
     display: flex;
     flex-direction: column;
-    overflow: scroll;
+    overflow: auto;
 }
 
 .assembly-type-form h3,
@@ -24,7 +24,7 @@
 
 .assembly-type-table .ant-table-wrapper {
     flex: 1;
-    overflow: scroll;
+    overflow: auto;
     display: flex;
     flex-direction: column;
 }

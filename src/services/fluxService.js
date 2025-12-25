@@ -218,6 +218,11 @@ class FluxService {
                 onerror: (err) => {
                     console.error('SSE onerror:', err);
 
+                    if (err?.name === 'AbortError' || !this.abortController) {
+                        console.log('Соединение прервано пользователем');
+                        throw err;
+                    }
+
                     this.retryCount++;
 
                     if (this.retryCount <= this.maxRetries) {
@@ -239,6 +244,10 @@ class FluxService {
                 },
 
                 onclose: () => {
+                    if (!this.abortController) {
+                        console.log('Соединение прервано пользователем, пропускаем обработку close');
+                        return;
+                    }
                     if (!completionReceived) {
                         if (lastTimeline && messageCount > 0) {
                             console.log('Соединение закрылось без события complete, используем последний таймлайн');

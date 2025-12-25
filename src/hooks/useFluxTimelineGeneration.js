@@ -10,9 +10,12 @@ export const useFluxTimelineGeneration = () => {
     const [optimizationHistory, setOptimizationHistory] = useState([]);
     const [timelineVersion, setTimelineVersion] = useState(0);
     const [retryCount, setRetryCount] = useState(0);
+
+    // === Throttling для истории графика ===
     const historyBufferRef = useRef([]);
     const lastHistoryUpdateRef = useRef(0);
     const historyUpdateTimerRef = useRef(null);
+
     useEffect(() => {
         if (!optimizationInfo || !optimizationInfo.currentIteration) return;
 
@@ -46,6 +49,7 @@ export const useFluxTimelineGeneration = () => {
         }
     }, [optimizationInfo]);
 
+    // Cleanup при размонтировании
     useEffect(() => {
         return () => {
             if (historyUpdateTimerRef.current) {
@@ -73,8 +77,13 @@ export const useFluxTimelineGeneration = () => {
                 },
 
                 onTimelineUpdate: (timelineData) => {
+                    // Просто передаём данные, семафор будет в TimelineView
                     setTimeline(timelineData);
                     setTimelineVersion(v => v + 1);
+                    console.log('📊 Timeline получен:', {
+                        events: timelineData?.maintenanceEvents?.length,
+                        validations: timelineData?.validations?.length
+                    });
                 },
 
                 onOptimizationInfo: (info) => {
@@ -82,8 +91,11 @@ export const useFluxTimelineGeneration = () => {
                 },
 
                 onComplete: (finalData) => {
+                    console.log('✅ Flux генерация завершена', finalData);
+
                     const tl = finalData?.timeline || finalData;
-                    const validations = finalData?.optimizationInformation?.best?.validations;
+                    const validations = finalData?.optimizationInformation?.current?.validations;
+
                     if (tl && validations) {
                         const timelineWithValidations = {
                             ...tl,
@@ -108,7 +120,7 @@ export const useFluxTimelineGeneration = () => {
                 },
 
                 onError: (err) => {
-                    console.error('Flux error:', err);
+                    console.error('❌ Flux error:', err);
                     setError(err?.message || 'Ошибка при генерации плана');
                     setProgress('');
                     setIsGenerating(false);
@@ -120,13 +132,14 @@ export const useFluxTimelineGeneration = () => {
                 },
             });
         } catch (err) {
-            console.error('Generate plan error:', err);
+            console.error('❌ Generate plan error:', err);
             setError(err?.message || 'Ошибка при генерации плана');
             setProgress('');
             setIsGenerating(false);
         }
     }, []);
 
+    // Флаг отмены
     const [wasCancelled, setWasCancelled] = useState(false);
 
     const cancelGenerationWithFlag = useCallback(() => {
